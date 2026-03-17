@@ -82,28 +82,28 @@ static void	assign_int(const t_option *options, char *value, t_parser_ctx *ctx) 
 	long	result = strtol(value, &endptr, 10);
 
 	if (*endptr != '\0' || endptr == value) {
-        ctx->err = ERR_INVALID_FORMAT;
+		ctx->err = ERR_INVALID_FORMAT;
 		ctx->value = value;
-        return;
-    }
+		return;
+	}
 
 	/**
 	 * Smart saturation
 	 * We handle the case where strtol itself overflow (ERANGE)
 	 * and the case where the length is valid but too large or too small for an int.
 	 */
-    if (errno == ERANGE) {
-        if (result > 0)
-            *((int *)options->value) = INT_MAX;
-        else
-            *((int *)options->value) = INT_MIN;
-    } else if (result > INT_MAX) {
-        *((int *)options->value) = INT_MAX;
-    } else if (result < INT_MIN) {
-        *((int *)options->value) = INT_MIN;
-    } else {
-        *((int *)options->value) = (int)result;
-    }
+	if (errno == ERANGE) {
+		if (result > 0)
+			*((int *)options->value) = INT_MAX;
+		else
+			*((int *)options->value) = INT_MIN;
+	} else if (result > INT_MAX) {
+		*((int *)options->value) = INT_MAX;
+	} else if (result < INT_MIN) {
+		*((int *)options->value) = INT_MIN;
+	} else {
+		*((int *)options->value) = (int)result;
+	}
 }
 
 static void	assign_uint(const t_option *options, char *value, t_parser_ctx *ctx) {
@@ -114,34 +114,34 @@ static void	assign_uint(const t_option *options, char *value, t_parser_ctx *ctx)
 	}
 	
 	char	*temp = value;
-    while (*temp == ' ' || (*temp >= '\t' && *temp <= '\r')) 
-        temp++;
-    if (*temp == '-') {
-        ctx->err = ERR_INVALID_FORMAT;
+	while (*temp == ' ' || (*temp >= '\t' && *temp <= '\r')) 
+		temp++;
+	if (*temp == '-') {
+		ctx->err = ERR_INVALID_FORMAT;
 		ctx->value = value;
-        return;
-    }
+		return;
+	}
 
 	errno = 0;
-    char          *endptr = NULL;
-    unsigned long result = strtoul(value, &endptr, 10);
+	char			*endptr = NULL;
+	unsigned long	result = strtoul(value, &endptr, 10);
 
-    if (*endptr != '\0' || endptr == value) {
-        ctx->err = ERR_INVALID_FORMAT;
+	if (*endptr != '\0' || endptr == value) {
+		ctx->err = ERR_INVALID_FORMAT;
 		ctx->value = value;
-        return;
-    }
+		return;
+	}
 
 	/**
 	 * Smart saturation
 	 * If strtoul detects an overflow (ERANGE) or if result
 	 * exceeds the range of an unsigned int.
 	 */
-    if (errno == ERANGE || result > UINT_MAX) {
-        *((unsigned int *)options->value) = UINT_MAX;
-    } else {
-        *((unsigned int *)options->value) = (unsigned int)result;
-    }
+	if (errno == ERANGE || result > UINT_MAX) {
+		*((unsigned int *)options->value) = UINT_MAX;
+	} else {
+		*((unsigned int *)options->value) = (unsigned int)result;
+	}
 }
 
 static void	assign_double(const t_option *options, char *value, t_parser_ctx *ctx) {

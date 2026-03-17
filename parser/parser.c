@@ -92,10 +92,10 @@ char	**parser(int argc, char **argv, const t_option *options, int mode, t_parser
 				}
 			}
 			assign(opt, value, ctx);
-    
+
 			if (equal_pos) *equal_pos = '=';
 			if (ctx->err != PARSER_SUCCESS) return (args);
-    
+
 			index++;
 			continue;
 		}
@@ -178,8 +178,8 @@ static const t_option	*find_short_option(const t_option *options, char c) {
 		}
 		if (options->flags & OPT_SHORT)
 			if (options->short_opt == c)
-            	return (options);
-        options++;
-    }
-    return (NULL);
+				return (options);
+		options++;
+	}
+	return (NULL);
 }

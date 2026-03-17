@@ -14,7 +14,7 @@ CFLAGS		=	-Wall -Wextra -Werror
 
 $(OBJS_DIR)/%.o: %.c
 	mkdir -p $(@D)
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+	$(CC) $(CFLAGS) -c $< -o $@
 
 $(NAME): $(OBJS_PATH)
 	$(CC) $(CFLAGS) $(OBJS_PATH) -o $(NAME)
