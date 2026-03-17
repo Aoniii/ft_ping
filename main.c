@@ -1,4 +1,6 @@
 #include "parser/parser.h"
+#include "ping.h"
+#include <stdbool.h>
 
 int	main(int argc, char **argv) {
 	t_parser_ctx	ctx;
@@ -6,11 +8,25 @@ int	main(int argc, char **argv) {
 
 	t_parser_info	info = {
 		.program		= argv[0],
-		.usage			= "",
-		.description	= ""
+		.usage			= "[OPTION...] HOST ...",
+		.description	= "Send ICMP ECHO_REQUEST packets to network hosts.\n",
+		.footer			= "\nMandatory or optional arguments to long options are \
+also mandatory or optional for any corresponding short options.\n\n\
+Options marked with (root only) are available only to superuser.\n\n\
+Report bugs to <https://github.com/Aoniii>."
 	};
 
+	bool	verbose = false;
+
 	t_option	option[] = {
+		CATEGORY("Options valid for all request types:\n"),
+		{
+			.short_opt	= 'v',
+			.long_opt	= "verbose",
+			.flags		= OPT_SHORT | OPT_LONG | TYPE_BOOLEAN,
+			.value		= &verbose,
+			.help		= "verbose output"
+		},
 		{
 			.short_opt	= '?',
 			.long_opt	= "help",
@@ -24,6 +40,7 @@ int	main(int argc, char **argv) {
 			},
 			.help		= ""
 		},
+		{0}
 	};
 
 	char	**args = parser(argc, argv, option, MODE_PERMISSIVE, &ctx);
@@ -33,7 +50,7 @@ int	main(int argc, char **argv) {
 		return (ctx.err == CALLBACK_EXIT ? 0 : 1);
 	}
 
-	//exec
+	ping(args, option);
 
 	cleaner(args);
 	return (0);

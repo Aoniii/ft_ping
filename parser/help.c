@@ -34,4 +34,6 @@ static void help(const t_parser_info info, const t_option *options) {
 			continue;
 		printf("%s %s\n", buf, opt->help);
 	}
+
+	printf("%s\n", info.footer);
 }

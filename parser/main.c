@@ -11,7 +11,8 @@ int	main(int argc, char **argv) {
 	t_parser_info	info = {
 		.program		= argv[0],
 		.usage			= "[Example...] Example ...",
-		.description	= "Description example"
+		.description	= "Description example",
+		.footer			= "Footer example"
 	};
 
 	/**		Options			*/

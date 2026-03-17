@@ -29,6 +29,7 @@ typedef struct	s_parser_info {
 	const char	*program;
 	const char	*usage;
 	const char	*description;
+	const char	*footer;
 }				t_parser_info;
 
 typedef struct	s_option {
