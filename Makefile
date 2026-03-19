@@ -38,7 +38,6 @@ $(NAME): $(OBJS_PATH)
 	@printf "$(RESET)[$(GREEN)DONE$(RESET)] 📦 $(CYAN)Echo reply: All objects received!$(RESET)\n"
 	@$(CC) $(CFLAGS) $(OBJS_PATH) -o $(NAME)
 	@rm -f .count
-	@sudo setcap cap_net_raw+ep $(NAME)
 	@printf "$(RESET)[$(GREEN)DONE$(RESET)] 🚀 $(BLUE)$(NAME) is ready to fly!$(RESET)\n"
 
 all:
