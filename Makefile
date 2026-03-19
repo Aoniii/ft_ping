@@ -36,7 +36,7 @@ $(OBJS_DIR)/%.o: %.c
 
 $(NAME): $(OBJS_PATH)
 	@printf "$(RESET)[$(GREEN)DONE$(RESET)] 📦 $(CYAN)Echo reply: All objects received!$(RESET)\n"
-	@$(CC) $(CFLAGS) $(OBJS_PATH) -o $(NAME)
+	@$(CC) $(CFLAGS) $(OBJS_PATH) -o $(NAME) -lm
 	@rm -f .count
 	@printf "$(RESET)[$(GREEN)DONE$(RESET)] 🚀 $(BLUE)$(NAME) is ready to fly!$(RESET)\n"
 

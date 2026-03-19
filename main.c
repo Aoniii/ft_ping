@@ -2,6 +2,9 @@
 #include "ping.h"
 #include <stdbool.h>
 
+t_stats	g_stats = {0};
+char	**g_args = 0;
+
 int	main(int argc, char **argv) {
 	t_parser_ctx	ctx;
 	ctx.err = PARSER_SUCCESS;
@@ -50,6 +53,7 @@ Report bugs to <https://github.com/Aoniii>."
 		return (ctx.err == CALLBACK_EXIT ? 0 : 1);
 	}
 
+	g_args = args;
 	ping(args, option);
 
 	cleaner(args);
