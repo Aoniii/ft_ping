@@ -38,7 +38,7 @@ static t_error	init(int *sock_fd, struct addrinfo *hints, struct addrinfo **res,
 	struct timeval	tv;
 	tv.tv_sec = 1;
 	tv.tv_usec = 0;
-	if (setsockopt(*sock_fd, SOL_SOCKET, SOL_SOCKET, &tv, sizeof(tv)) < 0) {
+	if (setsockopt(*sock_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
 		perror("setsockopt");
 		return (ERROR);
 	}
@@ -121,29 +121,42 @@ void	ping(char **args, t_option *option) {
 			struct timeval		end;
 			struct sockaddr_in	from;
 			socklen_t			from_len = sizeof(from);
-			if (recvfrom(sock_fd, recv_buf, sizeof(recv_buf), 0, (struct sockaddr *)&from, &from_len) > 0) {
-				// 4.1 Set receive time and change g_stats values
-				gettimeofday(&end, NULL);
-				double diff = (end.tv_sec - start.tv_sec) * 1000.0 + (end.tv_usec - start.tv_usec) / 1000.0;
-				g_stats.received++;
-				if (diff < g_stats.min) g_stats.min = diff;
-				if (diff > g_stats.max) g_stats.max = diff;
-				g_stats.sum += diff;
-				g_stats.sum_sq += (diff * diff);
+			ssize_t				ret = recvfrom(sock_fd, recv_buf, sizeof(recv_buf), 0, (struct sockaddr *)&from, &from_len);
+			if (ret > 0) {
+				// 4.1 Filtre
+				struct ip		*ip_res = (struct ip *)recv_buf;
+				int				hlen = ip_res->ip_hl << 2;
+				struct icmphdr	*icmp_res = (struct icmphdr *)(recv_buf + hlen);
 
-				// 4.2 Get ttl
-				struct ip		*ip_hdr = (struct ip *)recv_buf;
-				int				ttl = ip_hdr->ip_ttl;
+				if (icmp_res->type == ICMP_ECHOREPLY) {
+					if (icmp_res->un.echo.id == getpid() && icmp_res->un.echo.sequence == sequence - 1) {
+						// 4.2 Set receive time and change g_stats values
+						gettimeofday(&end, NULL);
+						double diff = (end.tv_sec - start.tv_sec) * 1000.0 + (end.tv_usec - start.tv_usec) / 1000.0;
 
-				// 4.3 Send message
-				printf(
-						"%d bytes from %s: icmp_seq=%d ttl=%d time=%.3f ms\n",
-						total_size,
-						inet_ntoa(from.sin_addr),
-						sequence - 1,
-						ttl,
-						diff
-				);
+						g_stats.received++;
+						if (diff < g_stats.min) g_stats.min = diff;
+						if (diff > g_stats.max) g_stats.max = diff;
+						g_stats.sum += diff;
+						g_stats.sum_sq += (diff * diff);
+
+						// 4.3 Get ttl
+						struct ip		*ip_hdr = (struct ip *)recv_buf;
+						int				ttl = ip_hdr->ip_ttl;
+
+						// 4.4 Send message
+						printf(
+								"%d bytes from %s: icmp_seq=%d ttl=%d time=%.3f ms\n",
+								total_size,
+								inet_ntoa(from.sin_addr),
+								sequence - 1,
+								ttl,
+								diff
+						);
+					}
+				} else if (icmp_res->type == ICMP_DEST_UNREACH) {
+					printf("%ld bytes from %s: Destination Host Unreachable\n", ret- hlen, inet_ntoa(from.sin_addr));
+				}
 			}
 			sleep(1);
 		}
