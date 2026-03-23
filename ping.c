@@ -108,18 +108,19 @@ void	ping(char **args, t_option *option) {
 	struct addrinfo	hints;
 	struct addrinfo	*res;
 	struct icmphdr	*icmp;
-	t_stats			stats;
 
 	int	index = 0;
 	int	payload_size = 56; //a changer c'est le -s de base c'est 56
 	int	total_size = sizeof(struct icmphdr) + payload_size;
 
 	while (args[index] && g_running) {
+		t_stats	stats;
 		char	packet[IP_MAXPACKET];
 		char	recv_buf[IP_MAXPACKET];
 		char	ip_str[INET_ADDRSTRLEN];
 		int		sequence = 0;
 
+		memset(&stats, 0, sizeof(t_stats));
 		if (init(&sock_fd, &hints, &res, args[0], &stats) != SUCCESS) {
 			cleaner(args);
 			return;
