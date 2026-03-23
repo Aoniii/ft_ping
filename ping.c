@@ -115,9 +115,9 @@ static const char	*get_icmp_error_msg(int type, int code) {
 void	ping(char **args, t_option *option) {
 	(void)option;
 
-	int				sock_fd = -1;
+	int				sock_fd;
 	struct addrinfo	hints;
-	struct addrinfo	*res = NULL;
+	struct addrinfo	*res;
 	struct icmphdr	*icmp;
 
 	int	index = 0;
@@ -131,7 +131,10 @@ void	ping(char **args, t_option *option) {
 		char	ip_str[INET_ADDRSTRLEN];
 		int		sequence = 0;
 
+		sock_fd = -1;
+		res = NULL;
 		memset(&stats, 0, sizeof(t_stats));
+
 		if (init(&sock_fd, &hints, &res, args[index], &stats) != SUCCESS)
 			break;
 
