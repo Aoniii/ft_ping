@@ -90,9 +90,8 @@ static void	print(t_stats stats) {
 
 	if (stats.received > 0) {
 		double	avg = stats.sum / stats.received;
-		double	mdev = sqrt((stats.sum_sq / stats.received) - (avg * avg));
-
-		if (mdev < 0) mdev = 0;
+		double	var = (stats.sum_sq / stats.received) - (avg * avg);
+		double	mdev = sqrt(var < 0 ? 0 : var);
 
 		printf(
 				"round-trip min/avg/max/mdev = %.3f/%.3f/%.3f/%.3f ms\n",
@@ -116,9 +115,9 @@ static const char	*get_icmp_error_msg(int type, int code) {
 void	ping(char **args, t_option *option) {
 	(void)option;
 
-	int				sock_fd;
+	int				sock_fd = -1;
 	struct addrinfo	hints;
-	struct addrinfo	*res;
+	struct addrinfo	*res = NULL;
 	struct icmphdr	*icmp;
 
 	int	index = 0;
@@ -133,16 +132,14 @@ void	ping(char **args, t_option *option) {
 		int		sequence = 0;
 
 		memset(&stats, 0, sizeof(t_stats));
-		if (init(&sock_fd, &hints, &res, args[index], &stats) != SUCCESS) {
-			cleaner(args);
-			return;
-		}
+		if (init(&sock_fd, &hints, &res, args[index], &stats) != SUCCESS)
+			break;
 
 		signal(SIGINT, sig_handler);
 		setIPstr(res, &ip_str);
 		icmp = (struct icmphdr *)packet;
 
-		printf("PING %s (%s): %d data bytes\n", args[0], ip_str, payload_size);
+		printf("PING %s (%s): %d data bytes\n", args[index], ip_str, payload_size);
 		while (g_running) {
 			// 1. Setup icmp 
 			memset(packet, 0, total_size);
@@ -222,8 +219,8 @@ void	ping(char **args, t_option *option) {
 		}
 		print(stats);
 
-		close(sock_fd);
-		freeaddrinfo(res);
+		if (sock_fd != -1) close(sock_fd);
+		if (res != NULL) freeaddrinfo(res);
 		index++;
 	}
 }
