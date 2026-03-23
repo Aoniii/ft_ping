@@ -23,6 +23,7 @@ typedef enum	e_error {
 
 extern t_stats	g_stats;
 extern char		**g_args;
+extern int		g_sock_fd;
 
 void	ping(char **args, t_option *option);
 void	sig_handler(int sig);

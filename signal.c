@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <sys/time.h>
 #include <stdio.h>
+#include <unistd.h>
 
 void	sig_handler(int sig) {
 	(void)sig;
@@ -36,6 +37,7 @@ void	sig_handler(int sig) {
 		);
 	}
 
+	close(g_sock_fd);
 	cleaner(g_args);
 	exit(0);
 }

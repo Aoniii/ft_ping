@@ -4,6 +4,7 @@
 
 t_stats	g_stats = {0};
 char	**g_args = 0;
+int		g_sock_fd = 0;
 
 int	main(int argc, char **argv) {
 	t_parser_ctx	ctx;

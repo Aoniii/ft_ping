@@ -1,5 +1,6 @@
 #include "parser/parser.h"
 #include "ping.h"
+#include <bits/types/struct_timeval.h>
 #include <signal.h>
 #include <stdio.h>
 #include <string.h>
@@ -72,7 +73,6 @@ static void	setIPstr(struct addrinfo *res, char ip_str[][INET_ADDRSTRLEN]) {
 void	ping(char **args, t_option *option) {
 	(void)option;
 
-	int				sock_fd;
 	struct addrinfo	hints;
 	struct addrinfo	*res;
 	struct icmphdr	*icmp;
@@ -87,7 +87,7 @@ void	ping(char **args, t_option *option) {
 		char	ip_str[INET_ADDRSTRLEN];
 		int		sequence = 0;
 
-		if (init(&sock_fd, &hints, &res, args[0]) != SUCCESS) {
+		if (init(&g_sock_fd, &hints, &res, args[0]) != SUCCESS) {
 			cleaner(args);
 			return;
 		}
@@ -112,7 +112,7 @@ void	ping(char **args, t_option *option) {
 
 			// 3. Send packet
 			g_stats.transmitted++;
-			if (sendto(sock_fd, packet, total_size, 0, res->ai_addr, res->ai_addrlen) <= 0) {
+			if (sendto(g_sock_fd, packet, total_size, 0, res->ai_addr, res->ai_addrlen) <= 0) {
 				perror("sendto");
 				return;
 			}
@@ -121,7 +121,7 @@ void	ping(char **args, t_option *option) {
 			struct timeval		end;
 			struct sockaddr_in	from;
 			socklen_t			from_len = sizeof(from);
-			ssize_t				ret = recvfrom(sock_fd, recv_buf, sizeof(recv_buf), 0, (struct sockaddr *)&from, &from_len);
+			ssize_t				ret = recvfrom(g_sock_fd, recv_buf, sizeof(recv_buf), 0, (struct sockaddr *)&from, &from_len);
 			if (ret > 0) {
 				// 4.1 Filtre
 				struct ip		*ip_res = (struct ip *)recv_buf;
@@ -158,8 +158,19 @@ void	ping(char **args, t_option *option) {
 					printf("%ld bytes from %s: Destination Host Unreachable\n", ret- hlen, inet_ntoa(from.sin_addr));
 				}
 			}
-			sleep(1);
+
+			// 5. Waiting
+			struct timeval	now;
+			gettimeofday(&now, NULL);
+
+			long	elapsed =	(now.tv_sec - start.tv_sec) * 1000000 +
+								(now.tv_usec - start.tv_usec);
+			
+			if (elapsed < 1000000)
+				usleep(1000000 - elapsed);
 		}
+
+		close(g_sock_fd);
 		freeaddrinfo(res);
 		index++;
 	}
