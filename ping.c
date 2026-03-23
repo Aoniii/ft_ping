@@ -2,6 +2,7 @@
 #include "ping.h"
 #include <bits/types/struct_timeval.h>
 #include <signal.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -91,6 +92,8 @@ static void	print(t_stats stats) {
 		double	avg = stats.sum / stats.received;
 		double	mdev = sqrt((stats.sum_sq / stats.received) - (avg * avg));
 
+		if (mdev < 0) mdev = 0;
+
 		printf(
 				"round-trip min/avg/max/mdev = %.3f/%.3f/%.3f/%.3f ms\n",
 				stats.min,
@@ -99,6 +102,15 @@ static void	print(t_stats stats) {
 				mdev
 		);
 	}
+}
+
+static const char	*get_icmp_error_msg(int type, int code) {
+	for (size_t i = 0; i < sizeof(g_icmp_errors) / sizeof(g_icmp_errors[0]); i++) {
+		if (g_icmp_errors[i].type == type && g_icmp_errors[i].code == code)
+			return (g_icmp_errors[i].msg);
+	}
+
+	return ("Unknow ICMP Error");
 }
 
 void	ping(char **args, t_option *option) {
@@ -121,7 +133,7 @@ void	ping(char **args, t_option *option) {
 		int		sequence = 0;
 
 		memset(&stats, 0, sizeof(t_stats));
-		if (init(&sock_fd, &hints, &res, args[0], &stats) != SUCCESS) {
+		if (init(&sock_fd, &hints, &res, args[index], &stats) != SUCCESS) {
 			cleaner(args);
 			return;
 		}
@@ -188,8 +200,13 @@ void	ping(char **args, t_option *option) {
 								diff
 						);
 					}
-				} else if (icmp_res->type == ICMP_DEST_UNREACH) {
-					printf("%ld bytes from %s: Destination Host Unreachable\n", ret - hlen, inet_ntoa(from.sin_addr));
+				} else {
+					printf(
+							"%ld bytes from %s: %s\n",
+							ret - hlen,
+							inet_ntoa(from.sin_addr),
+							get_icmp_error_msg(icmp_res->type, icmp_res->code)
+					);
 				}
 			}
 
