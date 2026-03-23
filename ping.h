@@ -2,6 +2,7 @@
 # define PING_H
 
 # include <bits/types/struct_timeval.h>
+# include <stdbool.h>
 
 typedef struct s_option t_option;
 
@@ -21,9 +22,7 @@ typedef enum	e_error {
 	ERROR,
 }				t_error;
 
-extern t_stats	g_stats;
-extern char		**g_args;
-extern int		g_sock_fd;
+extern bool		g_running;
 
 void	ping(char **args, t_option *option);
 void	sig_handler(int sig);

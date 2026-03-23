@@ -12,6 +12,7 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <sys/time.h>
+#include <math.h>
 
 static unsigned short calculate_checksum(void *b, int len) {
 	unsigned short	*buf = b;
@@ -28,7 +29,7 @@ static unsigned short calculate_checksum(void *b, int len) {
 	return result;
 }
 
-static t_error	init(int *sock_fd, struct addrinfo *hints, struct addrinfo **res, char *args) {
+static t_error	init(int *sock_fd, struct addrinfo *hints, struct addrinfo **res, char *args, t_stats *stats) {
 	// 1. Socket creation
 	if ((*sock_fd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP)) == -1) {
 		perror("socket");
@@ -55,12 +56,12 @@ static t_error	init(int *sock_fd, struct addrinfo *hints, struct addrinfo **res,
 	}
 
 	// 4. Init g_stats
-	g_stats.addr = args;
-	g_stats.min = 1e9;
-	g_stats.max = 0;
-	g_stats.sum = 0;
-	g_stats.sum_sq = 0;
-	gettimeofday(&g_stats.start, NULL);
+	stats->addr = args;
+	stats->min = 1e9;
+	stats->max = 0;
+	stats->sum = 0;
+	stats->sum_sq = 0;
+	gettimeofday(&stats->start, NULL);
 
 	return (SUCCESS);
 }
@@ -70,24 +71,56 @@ static void	setIPstr(struct addrinfo *res, char ip_str[][INET_ADDRSTRLEN]) {
 	inet_ntop(AF_INET, &(ipv4->sin_addr), *ip_str, INET_ADDRSTRLEN);
 }
 
+static void	print(t_stats stats) {
+	struct timeval	end;
+	gettimeofday(&end, NULL);
+
+	int		loss = 0;
+	if (stats.transmitted > 0)
+		loss = (stats.transmitted - stats.received) * 100 / stats.transmitted;
+
+	printf("--- %s ping statistics ---\n", stats.addr);
+	printf(
+			"%d packets transmitted, %d received, %d%% packet loss\n",
+			stats.transmitted,
+			stats.received,
+			loss
+	);
+
+	if (stats.received > 0) {
+		double	avg = stats.sum / stats.received;
+		double	mdev = sqrt((stats.sum_sq / stats.received) - (avg * avg));
+
+		printf(
+				"round-trip min/avg/max/mdev = %.3f/%.3f/%.3f/%.3f ms\n",
+				stats.min,
+				avg,
+				stats.max,
+				mdev
+		);
+	}
+}
+
 void	ping(char **args, t_option *option) {
 	(void)option;
 
+	int				sock_fd;
 	struct addrinfo	hints;
 	struct addrinfo	*res;
 	struct icmphdr	*icmp;
+	t_stats			stats;
 
 	int	index = 0;
 	int	payload_size = 56; //a changer c'est le -s de base c'est 56
 	int	total_size = sizeof(struct icmphdr) + payload_size;
 
-	while (args[index]) {
+	while (args[index] && g_running) {
 		char	packet[IP_MAXPACKET];
 		char	recv_buf[IP_MAXPACKET];
 		char	ip_str[INET_ADDRSTRLEN];
 		int		sequence = 0;
 
-		if (init(&g_sock_fd, &hints, &res, args[0]) != SUCCESS) {
+		if (init(&sock_fd, &hints, &res, args[0], &stats) != SUCCESS) {
 			cleaner(args);
 			return;
 		}
@@ -97,7 +130,7 @@ void	ping(char **args, t_option *option) {
 		icmp = (struct icmphdr *)packet;
 
 		printf("PING %s (%s): %d data bytes\n", args[0], ip_str, payload_size);
-		while (1) {
+		while (g_running) {
 			// 1. Setup icmp 
 			memset(packet, 0, total_size);
 			icmp->type = ICMP_ECHO;
@@ -111,8 +144,8 @@ void	ping(char **args, t_option *option) {
 			gettimeofday(&start, NULL);
 
 			// 3. Send packet
-			g_stats.transmitted++;
-			if (sendto(g_sock_fd, packet, total_size, 0, res->ai_addr, res->ai_addrlen) <= 0) {
+			stats.transmitted++;
+			if (sendto(sock_fd, packet, total_size, 0, res->ai_addr, res->ai_addrlen) <= 0) {
 				perror("sendto");
 				return;
 			}
@@ -121,7 +154,7 @@ void	ping(char **args, t_option *option) {
 			struct timeval		end;
 			struct sockaddr_in	from;
 			socklen_t			from_len = sizeof(from);
-			ssize_t				ret = recvfrom(g_sock_fd, recv_buf, sizeof(recv_buf), 0, (struct sockaddr *)&from, &from_len);
+			ssize_t				ret = recvfrom(sock_fd, recv_buf, sizeof(recv_buf), 0, (struct sockaddr *)&from, &from_len);
 			if (ret > 0) {
 				// 4.1 Filtre
 				struct ip		*ip_res = (struct ip *)recv_buf;
@@ -134,11 +167,11 @@ void	ping(char **args, t_option *option) {
 						gettimeofday(&end, NULL);
 						double diff = (end.tv_sec - start.tv_sec) * 1000.0 + (end.tv_usec - start.tv_usec) / 1000.0;
 
-						g_stats.received++;
-						if (diff < g_stats.min) g_stats.min = diff;
-						if (diff > g_stats.max) g_stats.max = diff;
-						g_stats.sum += diff;
-						g_stats.sum_sq += (diff * diff);
+						stats.received++;
+						if (diff < stats.min) stats.min = diff;
+						if (diff > stats.max) stats.max = diff;
+						stats.sum += diff;
+						stats.sum_sq += (diff * diff);
 
 						// 4.3 Get ttl
 						struct ip		*ip_hdr = (struct ip *)recv_buf;
@@ -155,7 +188,7 @@ void	ping(char **args, t_option *option) {
 						);
 					}
 				} else if (icmp_res->type == ICMP_DEST_UNREACH) {
-					printf("%ld bytes from %s: Destination Host Unreachable\n", ret- hlen, inet_ntoa(from.sin_addr));
+					printf("%ld bytes from %s: Destination Host Unreachable\n", ret - hlen, inet_ntoa(from.sin_addr));
 				}
 			}
 
@@ -169,8 +202,9 @@ void	ping(char **args, t_option *option) {
 			if (elapsed < 1000000)
 				usleep(1000000 - elapsed);
 		}
+		print(stats);
 
-		close(g_sock_fd);
+		close(sock_fd);
 		freeaddrinfo(res);
 		index++;
 	}
