@@ -66,112 +66,115 @@ void	ping(char **args, t_data data) {
 		char	ip_str[INET_ADDRSTRLEN];
 		int		sequence = 0;
 
+		// 1. Init variables
 		sock_fd = -1;
 		res = NULL;
 		memset(&stats, 0, sizeof(t_stats));
 
+		// 2. Init socket and stats
 		if (init(&sock_fd, &hints, &res, args[index], &stats) != SUCCESS)
 			break;
 
+		// 3. Set signals
 		signal(SIGINT, sig_handler);
+		signal(SIGALRM, alarm_handler);
+
+		// 4. Set IP string
 		setIPstr(res, &ip_str);
+
+		// 5. Set ICMP header
 		icmp = (struct icmphdr *)packet;
 
+		// 6. Print header
 		printf("PING %s (%s): %d data bytes", args[index], ip_str, payload_size);
 		if (data.verbose)
 			printf(", id 0x%04x = %u", getpid() & 0xFFFF, getpid() & 0xFFFF);
 		printf("\n");
 
 		while (g_running) {
-			// 1. Setup icmp 
-			memset(packet, 0, total_size);
-			icmp->type = ICMP_ECHO;
-			icmp->code = 0;
-			icmp->un.echo.id = getpid();
-			icmp->un.echo.sequence = sequence++;
-			icmp->checksum = calculate_checksum(packet, total_size);
-
-			// 2. Set send time
 			struct timeval start;
-			gettimeofday(&start, NULL);
 
-			// 3. Send packet
-			stats.transmitted++;
-			if (sendto(sock_fd, packet, total_size, 0, res->ai_addr, res->ai_addrlen) <= 0) {
-				perror("sedto");
-				return;
+			if (g_waiting == false) {
+				// 7. Setup icmp
+				memset(packet, 0, total_size);
+				icmp->type = ICMP_ECHO;
+				icmp->code = 0;
+				icmp->un.echo.id = getpid();
+				icmp->un.echo.sequence = sequence++;
+				icmp->checksum = calculate_checksum(packet, total_size);
+
+				// 8. Send packet
+				gettimeofday(&start, NULL);
+				if (sendto(sock_fd, packet, total_size, 0, res->ai_addr, res->ai_addrlen) <= 0) {
+					perror("sendto");
+					return;
+				}
+				stats.transmitted++;
+				g_waiting = true;
+				alarm(1);
 			}
 
-			// 4. Receive packet
+			// 9. Receive packet
 			struct timeval		end;
 			struct sockaddr_in	from;
 			socklen_t			from_len = sizeof(from);
 
-			while (g_running) {
-				ssize_t	ret = recvfrom(sock_fd, recv_buf, sizeof(recv_buf), 0, (struct sockaddr *)&from, &from_len);
+			ssize_t	ret = recvfrom(sock_fd, recv_buf, sizeof(recv_buf), 0, (struct sockaddr *)&from, &from_len);
 
-				if (ret <= 0) break;
+			if (ret < 0)
+                continue;
 
-				struct ip		*ip_res = (struct ip *)recv_buf;
-				int				hlen = ip_res->ip_hl << 2;
-				struct icmphdr	*icmp_res = (struct icmphdr *)(recv_buf + hlen);
+			// 10. Analyse packet
+			struct ip		*ip_res = (struct ip *)recv_buf;
+			int				hlen = ip_res->ip_hl << 2;
+			struct icmphdr	*icmp_res = (struct icmphdr *)(recv_buf + hlen);
 
-				if (icmp_res->type == ICMP_ECHOREPLY) {
-					if (icmp_res->un.echo.id == getpid()) {
-						if (icmp_res->un.echo.sequence == sequence - 1) {
-							// 4.2 Set receive time and change stats values
-							gettimeofday(&end, NULL);
-							double diff = (end.tv_sec - start.tv_sec) * 1000.0 + (end.tv_usec - start.tv_usec) / 1000.0;
+			if (icmp_res->type == ICMP_ECHOREPLY) {
+				if (icmp_res->un.echo.id == getpid()) {
+					if (icmp_res->un.echo.sequence == sequence - 1) {
+						// 10.2 Set receive time and change stats values
+						gettimeofday(&end, NULL);
+						double diff = (end.tv_sec - start.tv_sec) * 1000.0 + (end.tv_usec - start.tv_usec) / 1000.0;
 
-							stats.received++;
-							if (diff < stats.min) stats.min = diff;
-							if (diff > stats.max) stats.max = diff;
-							stats.sum += diff;
-							stats.sum_sq += (diff * diff);
+						stats.received++;
+						if (diff < stats.min) stats.min = diff;
+						if (diff > stats.max) stats.max = diff;
+						stats.sum += diff;
+						stats.sum_sq += (diff * diff);
 
-							// 4.3 Get ttl
-							struct ip		*ip_hdr = (struct ip *)recv_buf;
-							int				ttl = ip_hdr->ip_ttl;
+						// 10.3 Get ttl
+						struct ip		*ip_hdr = (struct ip *)recv_buf;
+						int				ttl = ip_hdr->ip_ttl;
 
-							// 4.4 Send message
-							printf(
-									"%d bytes from %s: icmp_seq=%d ttl=%d time=%.3f ms\n",
-									total_size,
-									inet_ntoa(from.sin_addr),
-									sequence - 1,
-									ttl,
-									diff
-							);
-
-							break;
-						}
+						// 10.4 Send message
+						printf(
+								"%d bytes from %s: icmp_seq=%d ttl=%d time=%.3f ms\n",
+								total_size,
+								inet_ntoa(from.sin_addr),
+								sequence - 1,
+								ttl,
+								diff
+						);
 					}
-				} else {
-					printf(
-							"%ld bytes from %s: %s\n",
-							ret - hlen,
-							inet_ntoa(from.sin_addr),
-							get_icmp_error_msg(icmp_res->type, icmp_res->code)
-					);
-
-					if (data.verbose)
-						print_verbose(icmp_res);
-
-					break;
 				}
-			}
-			// 5. Waiting
-			struct timeval	now;
-			gettimeofday(&now, NULL);
+			} else {
+				// 11 Print error message
+				printf(
+						"%ld bytes from %s: %s\n",
+						ret - hlen,
+						inet_ntoa(from.sin_addr),
+						get_icmp_error_msg(icmp_res->type, icmp_res->code)
+				);
 
-			long	elapsed =	(now.tv_sec - start.tv_sec) * 1000000 +
-								(now.tv_usec - start.tv_usec);
-			
-			if (elapsed < 1000000)
-				usleep(1000000 - elapsed);
+				if (data.verbose)
+					print_verbose(icmp_res);
+			}
 		}
+
+		// 12. Print stats
 		print_stats(stats);
 
+		// 13. Close socket and free resources
 		if (sock_fd != -1) close(sock_fd);
 		if (res != NULL) freeaddrinfo(res);
 		index++;

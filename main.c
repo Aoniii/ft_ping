@@ -3,6 +3,7 @@
 #include <stdbool.h>
 
 bool	g_running = true;
+bool	g_waiting = false;
 
 int	main(int argc, char **argv) {
 	t_parser_ctx	ctx;
