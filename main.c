@@ -18,7 +18,9 @@ Options marked with (root only) are available only to superuser.\n\n\
 Report bugs to <https://github.com/Aoniii>."
 	};
 
-	bool	verbose = false;
+	t_data	data = {
+		.verbose = false
+	};
 
 	t_option	option[] = {
 		CATEGORY("Options valid for all request types:\n"),
@@ -26,7 +28,7 @@ Report bugs to <https://github.com/Aoniii>."
 			.short_opt	= 'v',
 			.long_opt	= "verbose",
 			.flags		= OPT_SHORT | OPT_LONG | TYPE_BOOLEAN,
-			.value		= &verbose,
+			.value		= &data.verbose,
 			.help		= "verbose output"
 		},
 		{
@@ -52,7 +54,7 @@ Report bugs to <https://github.com/Aoniii>."
 		return (ctx.err == CALLBACK_EXIT ? 0 : 1);
 	}
 
-	ping(args, option);
+	ping(args, data);
 
 	cleaner(args);
 	return (0);

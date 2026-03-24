@@ -2,11 +2,14 @@
 # define PING_H
 
 # include <bits/types/struct_timeval.h>
-#include <netinet/ip_icmp.h>
+# include <netinet/ip_icmp.h>
 # include <stdbool.h>
+# include <netdb.h>
 
-// Define t_option without include all parser header.
-typedef struct s_option t_option;
+// Data structure
+typedef struct	s_data {
+	bool		verbose;
+}				t_data;
 
 // Stats structure
 typedef struct		s_stats {
@@ -49,7 +52,12 @@ static const struct s_icmp_err g_icmp_errors[] = {
 // Global variable for running.
 extern bool		g_running;
 
-void	ping(char **args, t_option *option);
-void	sig_handler(int sig);
+void			ping(char **args, t_data data);
+unsigned short	calculate_checksum(void *b, int len);
+void			sig_handler(int sig);
+void			setIPstr(struct addrinfo *res, char ip_str[][INET_ADDRSTRLEN]);
+const char		*get_icmp_error_msg(int type, int code);
+void			print_stats(t_stats stats);
+void			print_verbose(struct icmphdr *icmp);
 
 #endif
