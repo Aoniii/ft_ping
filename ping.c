@@ -11,15 +11,14 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <sys/time.h>
+#include <errno.h>
 
 static t_error	init(int *sock_fd, struct addrinfo *hints, struct addrinfo **res, char *args, t_stats *stats) {
-	// 1. Socket creation
 	if ((*sock_fd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP)) == -1) {
 		perror("socket");
 		return (ERROR);
 	}
 
-	// 2. Timeout configuration
 	struct timeval	tv;
 	tv.tv_sec = 1;
 	tv.tv_usec = 0;
@@ -28,7 +27,6 @@ static t_error	init(int *sock_fd, struct addrinfo *hints, struct addrinfo **res,
 		return (ERROR);
 	}
 
-	// 3. DNS
 	memset(hints, 0, sizeof(*hints));
 	(*hints).ai_family = AF_INET;
 	(*hints).ai_socktype = SOCK_RAW;
@@ -38,146 +36,146 @@ static t_error	init(int *sock_fd, struct addrinfo *hints, struct addrinfo **res,
 		return (ERROR);
 	}
 
-	// 4. Init stats
 	stats->addr = args;
 	stats->min = 1e9;
 	stats->max = 0;
 	stats->sum = 0;
 	stats->sum_sq = 0;
+	stats->transmitted = 0;
+	stats->received = 0;
 	gettimeofday(&stats->start, NULL);
 
 	return (SUCCESS);
 }
 
-void	ping(char **args, t_data data) {
-	int				sock_fd;
-	struct addrinfo	hints;
-	struct addrinfo	*res;
-	struct icmphdr	*icmp;
+static void	handle_response(int ret, char *recv_buf, struct sockaddr_in *from, struct timeval *start, t_stats *stats, t_data data) {
+	if (ret < (int)sizeof(struct ip)) {
+		if (data.verbose)
+			fprintf(stderr, "ft_ping: packet too short (%d bytes) for IP header\n", ret);
+		return;
+	}
 
+	struct ip		*ip_res = (struct ip *)recv_buf;
+	int				hlen = ip_res->ip_hl << 2;
+
+	if (hlen < (int)sizeof(struct ip) || hlen > ret) {
+		if (data.verbose)
+			fprintf(stderr, "ft_ping: invalid IP header length (%d bytes)\n", hlen);
+		return;
+	}
+
+	if (ret < hlen + (int)sizeof(struct icmphdr)) {
+		if (data.verbose)
+			fprintf(stderr, "ft_ping: packet too short for ICMP header\n");
+		return;
+	}
+
+	struct icmphdr	*icmp_res = (struct icmphdr *)(recv_buf + hlen);
+	struct timeval	end;
+
+	if (icmp_res->type == ICMP_ECHOREPLY) {
+		if (icmp_res->un.echo.id == (uint16_t)(getpid() & 0xFFFF)) {
+			gettimeofday(&end, NULL);
+			double diff = (end.tv_sec - start->tv_sec) * 1000.0 + (end.tv_usec - start->tv_usec) / 1000.0;
+			
+			stats->received++;
+			if (diff < stats->min) stats->min = diff;
+			if (diff > stats->max) stats->max = diff;
+			stats->sum += diff;
+			stats->sum_sq += (diff * diff);
+
+			printf("%d bytes from %s: icmp_seq=%d ttl=%d time=%.3f ms\n",
+				   ret - hlen, inet_ntoa(from->sin_addr), icmp_res->un.echo.sequence, ip_res->ip_ttl, diff);
+		}
+	} else {
+		printf("%d bytes from %s: %s\n", ret - hlen, inet_ntoa(from->sin_addr), 
+			   get_icmp_error_msg(icmp_res->type, icmp_res->code));
+		if (data.verbose)
+			print_verbose(icmp_res);
+	}
+}
+
+static t_error	send_ping(int sock_fd, struct addrinfo *res, int seq, int total_size) {
+	char			packet[IP_MAXPACKET];
+	struct icmphdr	*icmp = (struct icmphdr *)packet;
+
+	memset(packet, 0, total_size);
+	icmp->type = ICMP_ECHO;
+	icmp->un.echo.id = (uint16_t)(getpid() & 0xFFFF);
+	icmp->un.echo.sequence = seq;
+	icmp->checksum = calculate_checksum(packet, total_size);
+
+	if (sendto(sock_fd, packet, total_size, 0, res->ai_addr, res->ai_addrlen) <= 0) {
+		perror("sendto");
+		return (ERROR);
+	}
+	return (SUCCESS);
+}
+
+static void ping_loop(int sock_fd, struct addrinfo *res, t_stats *stats, t_data data, int total_size) {
+	char				recv_buf[IP_MAXPACKET];
+	struct sockaddr_in	from;
+	socklen_t			from_len;
+	struct timeval		start;
+	int					sequence = 0;
+
+	g_waiting = false;
+
+	while (g_running) {
+		if (g_waiting == false) {
+			gettimeofday(&start, NULL);
+			if (send_ping(sock_fd, res, sequence++, total_size) == ERROR)
+				break;
+			stats->transmitted++;
+			g_waiting = true;
+			alarm(1);
+		}
+
+		from_len = sizeof(from);
+		ssize_t ret = recvfrom(sock_fd, recv_buf, sizeof(recv_buf), 0, (struct sockaddr *)&from, &from_len);
+		if (ret < 0) {
+			if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK)
+				continue;
+			perror("recvfrom");
+			break;
+		}
+		
+		if (ret > 0) {
+			handle_response(ret, recv_buf, &from, &start, stats, data);
+		}
+	}
+}
+
+void	ping(char **args, t_data data) {
 	int	index = 0;
-	int	payload_size = 56; //a changer c'est le -s de base c'est 56
+	int	payload_size = 56;
 	int	total_size = sizeof(struct icmphdr) + payload_size;
 
+	signal(SIGALRM, alarm_handler);
+	signal(SIGINT, sig_handler);
+
 	while (args[index] && g_running) {
-		t_stats	stats;
-		char	packet[IP_MAXPACKET];
-		char	recv_buf[IP_MAXPACKET];
-		char	ip_str[INET_ADDRSTRLEN];
-		int		sequence = 0;
+		int				sock_fd;
+		struct addrinfo	hints, *res;
+		t_stats			stats;
+		char			ip_str[INET_ADDRSTRLEN];
 
-		// 1. Init variables
-		sock_fd = -1;
-		res = NULL;
-		memset(&stats, 0, sizeof(t_stats));
+		if (init(&sock_fd, &hints, &res, args[index], &stats) != SUCCESS) {
+			index++;
+			continue;
+		}
 
-		// 2. Init socket and stats
-		if (init(&sock_fd, &hints, &res, args[index], &stats) != SUCCESS)
-			break;
-
-		// 3. Set signals
-		signal(SIGINT, sig_handler);
-		signal(SIGALRM, alarm_handler);
-
-		// 4. Set IP string
 		setIPstr(res, &ip_str);
-
-		// 5. Set ICMP header
-		icmp = (struct icmphdr *)packet;
-
-		// 6. Print header
 		printf("PING %s (%s): %d data bytes", args[index], ip_str, payload_size);
 		if (data.verbose)
 			printf(", id 0x%04x = %u", getpid() & 0xFFFF, getpid() & 0xFFFF);
 		printf("\n");
 
-		while (g_running) {
-			struct timeval start;
+		ping_loop(sock_fd, res, &stats, data, total_size);
 
-			if (g_waiting == false) {
-				// 7. Setup icmp
-				memset(packet, 0, total_size);
-				icmp->type = ICMP_ECHO;
-				icmp->code = 0;
-				icmp->un.echo.id = getpid();
-				icmp->un.echo.sequence = sequence++;
-				icmp->checksum = calculate_checksum(packet, total_size);
-
-				// 8. Send packet
-				gettimeofday(&start, NULL);
-				if (sendto(sock_fd, packet, total_size, 0, res->ai_addr, res->ai_addrlen) <= 0) {
-					perror("sendto");
-					return;
-				}
-				stats.transmitted++;
-				g_waiting = true;
-				alarm(1);
-			}
-
-			// 9. Receive packet
-			struct timeval		end;
-			struct sockaddr_in	from;
-			socklen_t			from_len = sizeof(from);
-
-			ssize_t	ret = recvfrom(sock_fd, recv_buf, sizeof(recv_buf), 0, (struct sockaddr *)&from, &from_len);
-
-			if (ret < 0)
-                continue;
-
-			// 10. Analyse packet
-			struct ip		*ip_res = (struct ip *)recv_buf;
-			int				hlen = ip_res->ip_hl << 2;
-			struct icmphdr	*icmp_res = (struct icmphdr *)(recv_buf + hlen);
-
-			if (icmp_res->type == ICMP_ECHOREPLY) {
-				if (icmp_res->un.echo.id == getpid()) {
-					if (icmp_res->un.echo.sequence == sequence - 1) {
-						// 10.2 Set receive time and change stats values
-						gettimeofday(&end, NULL);
-						double diff = (end.tv_sec - start.tv_sec) * 1000.0 + (end.tv_usec - start.tv_usec) / 1000.0;
-
-						stats.received++;
-						if (diff < stats.min) stats.min = diff;
-						if (diff > stats.max) stats.max = diff;
-						stats.sum += diff;
-						stats.sum_sq += (diff * diff);
-
-						// 10.3 Get ttl
-						struct ip		*ip_hdr = (struct ip *)recv_buf;
-						int				ttl = ip_hdr->ip_ttl;
-
-						// 10.4 Send message
-						printf(
-								"%d bytes from %s: icmp_seq=%d ttl=%d time=%.3f ms\n",
-								total_size,
-								inet_ntoa(from.sin_addr),
-								sequence - 1,
-								ttl,
-								diff
-						);
-					}
-				}
-			} else {
-				// 11 Print error message
-				printf(
-						"%ld bytes from %s: %s\n",
-						ret - hlen,
-						inet_ntoa(from.sin_addr),
-						get_icmp_error_msg(icmp_res->type, icmp_res->code)
-				);
-
-				if (data.verbose)
-					print_verbose(icmp_res);
-			}
-		}
-
-		// 12. Print stats
 		print_stats(stats);
-
-		// 13. Close socket and free resources
-		if (sock_fd != -1) close(sock_fd);
-		if (res != NULL) freeaddrinfo(res);
+		freeaddrinfo(res);
+		close(sock_fd);
 		index++;
 	}
 }
-

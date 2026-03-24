@@ -1,5 +1,6 @@
 #include "parser/parser.h"
 #include "ping.h"
+#include <stdio.h>
 #include <stdbool.h>
 
 bool	g_running = true;
@@ -53,6 +54,13 @@ Report bugs to <https://github.com/Aoniii>."
 		error(info.program, &ctx);
 		cleaner(args);
 		return (ctx.err == CALLBACK_EXIT ? 0 : 1);
+	}
+
+	if (!args || !args[0]) {
+		printf("ft_ping: missing host operand\n");
+		printf("Try 'ping --help' for more information.\n");
+		cleaner(args);
+		return (1);
 	}
 
 	ping(args, data);
