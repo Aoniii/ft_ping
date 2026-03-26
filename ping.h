@@ -5,6 +5,10 @@
 # include <netinet/ip_icmp.h>
 # include <stdbool.h>
 # include <netdb.h>
+# include <signal.h>
+
+extern volatile sig_atomic_t g_running;
+extern volatile sig_atomic_t g_waiting;
 
 // Data structure
 typedef struct	s_data {
@@ -35,10 +39,6 @@ struct			s_icmp_err {
 	int			code;
 	const char	*msg;
 };
-
-// Global variable for running and waiting.
-extern bool		g_running;
-extern bool		g_waiting;
 
 void			ping(char **args, t_data data);
 

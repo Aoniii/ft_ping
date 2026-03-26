@@ -24,6 +24,7 @@ static t_error	init(int *sock_fd, struct addrinfo *hints, struct addrinfo **res,
 	tv.tv_usec = 0;
 	if (setsockopt(*sock_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
 		perror("setsockopt");
+		close(*sock_fd);
 		return (ERROR);
 	}
 
@@ -33,6 +34,7 @@ static t_error	init(int *sock_fd, struct addrinfo *hints, struct addrinfo **res,
 
 	if (getaddrinfo(args, NULL, hints, res) != 0) {
 		fprintf(stderr, "ft_ping: unknown host\n");
+		close(*sock_fd);
 		return (ERROR);
 	}
 
@@ -90,8 +92,13 @@ static void	handle_response(int ret, char *recv_buf, struct sockaddr_in *from, s
 	} else {
 		printf("%d bytes from %s: %s\n", ret - hlen, inet_ntoa(from->sin_addr), 
 			   get_icmp_error_msg(icmp_res->type, icmp_res->code));
-		if (data.verbose)
-			print_verbose(icmp_res);
+		
+		if (data.verbose) {
+			int icmp_payload_len = ret - hlen - sizeof(struct icmphdr);
+
+			if (icmp_payload_len >= (int)sizeof(struct ip) + 8) print_verbose(icmp_res);
+			else fprintf(stderr, "ft_ping: verbose: truncated ICMP payload, cannot print headers\n");
+		}
 	}
 }
 
@@ -119,15 +126,13 @@ static void ping_loop(int sock_fd, struct addrinfo *res, t_stats *stats, t_data 
 	struct timeval		start;
 	int					sequence = 0;
 
-	g_waiting = false;
-
 	while (g_running) {
-		if (g_waiting == false) {
+		if (!g_waiting) {
 			gettimeofday(&start, NULL);
 			if (send_ping(sock_fd, res, sequence++, total_size) == ERROR)
 				break;
 			stats->transmitted++;
-			g_waiting = true;
+			g_waiting = 1;
 			alarm(1);
 		}
 

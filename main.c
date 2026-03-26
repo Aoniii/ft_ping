@@ -3,8 +3,8 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-bool	g_running = true;
-bool	g_waiting = false;
+volatile sig_atomic_t g_running = 1;
+volatile sig_atomic_t g_waiting = 0;
 
 int	main(int argc, char **argv) {
 	t_parser_ctx	ctx;

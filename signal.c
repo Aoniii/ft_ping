@@ -2,11 +2,11 @@
 
 void	sig_handler(int sig) {
 	(void)sig;
-	g_running = false;
+	g_running = 0;
 }
 
 void	alarm_handler(int sig) {
 	(void)sig;
-	g_waiting = false;
+	g_waiting = 0;
 }
 
