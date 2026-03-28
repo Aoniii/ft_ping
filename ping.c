@@ -3,6 +3,7 @@
 #include <netinet/ip_icmp.h>
 #include <signal.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -50,7 +51,7 @@ static t_error	init(int *sock_fd, struct addrinfo *hints, struct addrinfo **res,
 	return (SUCCESS);
 }
 
-static void	handle_response(int ret, char *recv_buf, struct sockaddr_in *from, t_stats *stats, t_data data) {
+static void	handle_response(int ret, char *recv_buf, struct sockaddr_in *from, t_stats *stats, t_data data, int expected_seq) {
 	if (ret < (int)sizeof(struct ip)) {
 		if (data.verbose)
 			fprintf(stderr, "ft_ping: packet too short (%d bytes) for IP header\n", ret);
@@ -76,7 +77,7 @@ static void	handle_response(int ret, char *recv_buf, struct sockaddr_in *from, t
 	struct timeval	start, end;
 
 	if (icmp_res->type == ICMP_ECHOREPLY) {
-		if (icmp_res->un.echo.id == (uint16_t)(getpid() & 0xFFFF)) {
+		if (icmp_res->un.echo.id == (uint16_t)(getpid() & 0xFFFF) && icmp_res->un.echo.sequence == (uint16_t)expected_seq) {
 			int	payload_len = ret - hlen - (int)sizeof(struct icmphdr);
 			if (payload_len >= (int)sizeof(struct timeval))
 				memcpy(&start, recv_buf + hlen + sizeof(struct icmphdr), sizeof(struct timeval));
@@ -87,7 +88,7 @@ static void	handle_response(int ret, char *recv_buf, struct sockaddr_in *from, t
 			gettimeofday(&end, NULL);
 
 			double diff = (end.tv_sec - start.tv_sec) * 1000.0 + (end.tv_usec - start.tv_usec) / 1000.0;
-			
+	
 			stats->received++;
 			if (diff < stats->min) stats->min = diff;
 			if (diff > stats->max) stats->max = diff;
@@ -155,9 +156,9 @@ static void ping_loop(int sock_fd, struct addrinfo *res, t_stats *stats, t_data 
 			perror("recvfrom");
 			break;
 		}
-		
+	
 		if (ret > 0) {
-			handle_response(ret, recv_buf, &from, stats, data);
+			handle_response(ret, recv_buf, &from, stats, data, sequence - 1);
 		}
 	}
 }
