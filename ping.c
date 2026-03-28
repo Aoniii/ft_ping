@@ -70,20 +70,20 @@ static void	handle_response(int ret, char *recv_buf, struct sockaddr_in *from, t
 	}
 
 	struct icmphdr	*icmp_res = (struct icmphdr *)(recv_buf + hlen);
-	struct timeval	start, end;
+	struct timeval	*start, end;
 
 	if (icmp_res->type == ICMP_ECHOREPLY) {
 		if (icmp_res->un.echo.id == (uint16_t)(getpid() & 0xFFFF) && icmp_res->un.echo.sequence == (uint16_t)expected_seq) {
 			int	payload_len = ret - hlen - (int)sizeof(struct icmphdr);
-			if (payload_len >= (int)sizeof(struct timeval))
-				memcpy(&start, recv_buf + hlen + sizeof(struct icmphdr), sizeof(struct timeval));
-			else {
+			if (payload_len >= (int)sizeof(struct timeval)) {
+				start = (struct timeval *)(recv_buf + hlen + sizeof(struct icmphdr));
+			} else {
 				fprintf(stderr, "ft_ping: payload too short for timestamp\n");
 				return;
 			}
 			gettimeofday(&end, NULL);
 
-			double diff = (end.tv_sec - start.tv_sec) * 1000.0 + (end.tv_usec - start.tv_usec) / 1000.0;
+			double diff = (end.tv_sec - start->tv_sec) * 1000.0 + (end.tv_usec - start->tv_usec) / 1000.0;
 	
 			stats->received++;
 			if (diff < stats->min) stats->min = diff;
@@ -99,9 +99,9 @@ static void	handle_response(int ret, char *recv_buf, struct sockaddr_in *from, t
 			   get_icmp_error_msg(icmp_res->type, icmp_res->code));
 		
 		if (data.verbose) {
-			int icmp_payload_len = ret - hlen - sizeof(struct icmphdr);
+			int icmp_payload_len = ret - hlen - (int)sizeof(struct icmphdr);
 
-			if (icmp_payload_len >= (int)sizeof(struct ip) + 8) print_verbose(icmp_res);
+			if (icmp_payload_len >= (int)sizeof(struct ip) + (int)sizeof(struct icmphdr)) print_verbose(icmp_res);
 			else fprintf(stderr, "ft_ping: verbose: truncated ICMP payload, cannot print headers\n");
 		}
 	}
@@ -118,7 +118,8 @@ static t_error	send_ping(int sock_fd, struct addrinfo *res, int seq, int total_s
 
 	struct timeval	now;
 	gettimeofday(&now, NULL);
-	memcpy(packet + sizeof(struct icmphdr), &now, sizeof(struct timeval));
+	struct timeval	*ts = (struct timeval *)(packet + sizeof(struct icmphdr));
+	*ts = now;
 
 	icmp->checksum = calculate_checksum(packet, total_size);
 
