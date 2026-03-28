@@ -38,7 +38,7 @@ void	print_stats(t_stats stats) {
 }
 
 void	print_verbose(struct icmphdr *icmp) {
-	struct ip		*orig_ip = (struct ip *)((char *)icmp + 8);
+	struct ip		*orig_ip = (struct ip *)((char *)icmp + sizeof(struct icmphdr));
 	size_t			hlen = orig_ip->ip_hl << 2;
 	unsigned char	*cp = (unsigned char *)orig_ip + hlen;
 
