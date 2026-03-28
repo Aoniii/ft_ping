@@ -2,10 +2,8 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
-#include <netinet/ip_icmp.h>
 #include <stddef.h>
 #include <stdio.h>
-#include <sys/time.h>
 #include <math.h>
 
 void	print_stats(t_stats stats) {

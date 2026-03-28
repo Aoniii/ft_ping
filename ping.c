@@ -1,5 +1,6 @@
 #include "ping.h"
 #include <bits/types/struct_timeval.h>
+#include <netinet/ip_icmp.h>
 #include <signal.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -7,10 +8,9 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
-#include <netinet/ip_icmp.h>
 #include <arpa/inet.h>
-#include <unistd.h>
 #include <sys/time.h>
+#include <unistd.h>
 #include <errno.h>
 
 static t_error	init(int *sock_fd, struct addrinfo *hints, struct addrinfo **res, char *args, t_stats *stats) {
@@ -50,7 +50,7 @@ static t_error	init(int *sock_fd, struct addrinfo *hints, struct addrinfo **res,
 	return (SUCCESS);
 }
 
-static void	handle_response(int ret, char *recv_buf, struct sockaddr_in *from, struct timeval *start, t_stats *stats, t_data data) {
+static void	handle_response(int ret, char *recv_buf, struct sockaddr_in *from, t_stats *stats, t_data data) {
 	if (ret < (int)sizeof(struct ip)) {
 		if (data.verbose)
 			fprintf(stderr, "ft_ping: packet too short (%d bytes) for IP header\n", ret);
@@ -73,12 +73,20 @@ static void	handle_response(int ret, char *recv_buf, struct sockaddr_in *from, s
 	}
 
 	struct icmphdr	*icmp_res = (struct icmphdr *)(recv_buf + hlen);
-	struct timeval	end;
+	struct timeval	start, end;
 
 	if (icmp_res->type == ICMP_ECHOREPLY) {
 		if (icmp_res->un.echo.id == (uint16_t)(getpid() & 0xFFFF)) {
+			int	payload_len = ret - hlen - (int)sizeof(struct icmphdr);
+			if (payload_len >= (int)sizeof(struct timeval))
+				memcpy(&start, recv_buf + hlen + sizeof(struct icmphdr), sizeof(struct timeval));
+			else {
+				fprintf(stderr, "ft_ping: payload too short for timestamp\n");
+				return;
+			}
 			gettimeofday(&end, NULL);
-			double diff = (end.tv_sec - start->tv_sec) * 1000.0 + (end.tv_usec - start->tv_usec) / 1000.0;
+
+			double diff = (end.tv_sec - start.tv_sec) * 1000.0 + (end.tv_usec - start.tv_usec) / 1000.0;
 			
 			stats->received++;
 			if (diff < stats->min) stats->min = diff;
@@ -110,6 +118,11 @@ static t_error	send_ping(int sock_fd, struct addrinfo *res, int seq, int total_s
 	icmp->type = ICMP_ECHO;
 	icmp->un.echo.id = (uint16_t)(getpid() & 0xFFFF);
 	icmp->un.echo.sequence = seq;
+
+	struct timeval	now;
+	gettimeofday(&now, NULL);
+	memcpy(packet + sizeof(struct icmphdr), &now, sizeof(struct timeval));
+
 	icmp->checksum = calculate_checksum(packet, total_size);
 
 	if (sendto(sock_fd, packet, total_size, 0, res->ai_addr, res->ai_addrlen) <= 0) {
@@ -123,12 +136,10 @@ static void ping_loop(int sock_fd, struct addrinfo *res, t_stats *stats, t_data 
 	char				recv_buf[IP_MAXPACKET];
 	struct sockaddr_in	from;
 	socklen_t			from_len;
-	struct timeval		start;
 	int					sequence = 0;
 
 	while (g_running) {
 		if (!g_waiting) {
-			gettimeofday(&start, NULL);
 			if (send_ping(sock_fd, res, sequence++, total_size) == ERROR)
 				break;
 			stats->transmitted++;
@@ -146,7 +157,7 @@ static void ping_loop(int sock_fd, struct addrinfo *res, t_stats *stats, t_data 
 		}
 		
 		if (ret > 0) {
-			handle_response(ret, recv_buf, &from, &start, stats, data);
+			handle_response(ret, recv_buf, &from, stats, data);
 		}
 	}
 }

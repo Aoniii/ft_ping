@@ -1,7 +1,6 @@
 #include "parser/parser.h"
 #include "ping.h"
 #include <stdio.h>
-#include <stdbool.h>
 
 volatile sig_atomic_t g_running = 1;
 volatile sig_atomic_t g_waiting = 0;
