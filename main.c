@@ -20,11 +20,12 @@ Report bugs to <https://github.com/Aoniii>."
 	};
 
 	t_data	data = {
-		.verbose = false
+		.verbose = false,
+		.size = 56
 	};
 
 	t_option	option[] = {
-		CATEGORY("Options valid for all request types:\n"),
+		CATEGORY(" Options valid for all request types:\n\n"),
 		{
 			.short_opt	= 'v',
 			.long_opt	= "verbose",
@@ -32,10 +33,19 @@ Report bugs to <https://github.com/Aoniii>."
 			.value		= &data.verbose,
 			.help		= "verbose output"
 		},
+		CATEGORY("\n Options valid for --echo requests:\n\n"),
+		{
+			.short_opt	= 's',
+			.long_opt	= "size",
+			.flags		= OPT_SHORT | OPT_LONG | TYPE_UINT,
+			.value		= &data.size,
+			.help		= "send NUMBER data octets"
+		},
+		CATEGORY("\n"),
 		{
 			.short_opt	= '?',
 			.long_opt	= "help",
-			.flags		= OPT_SHORT | OPT_LONG | OPT_CALLBACK_EXIT | OPT_HIDDEN_HELP | TYPE_CALLBACK,
+			.flags		= OPT_SHORT | OPT_LONG | OPT_CALLBACK_EXIT | TYPE_CALLBACK,
 			.value		= (void *)&(t_callback_info){
 				.fn = callback_help,
 				.data = (void *)&(t_help_data){
@@ -58,6 +68,11 @@ Report bugs to <https://github.com/Aoniii>."
 	if (!args || !args[0]) {
 		printf("ft_ping: missing host operand\n");
 		printf("Try 'ping --help' for more information.\n");
+		cleaner(args);
+		return (1);
+	}
+
+	if (check_data(data) != SUCCESS) {
 		cleaner(args);
 		return (1);
 	}

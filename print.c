@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include <math.h>
 
-void	print_stats(t_stats stats) {
+void	print_stats(t_stats stats, t_data data) {
 	struct timeval	end;
 	gettimeofday(&end, NULL);
 
@@ -22,7 +22,7 @@ void	print_stats(t_stats stats) {
 			loss
 	);
 
-	if (stats.received > 0) {
+	if (stats.received > 0 && data.size >= 16) {
 		double	avg = stats.sum / stats.received;
 		double	var = (stats.sum_sq / stats.received) - (avg * avg);
 		double	mdev = sqrt(var < 0 ? 0 : var);

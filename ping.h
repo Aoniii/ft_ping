@@ -13,6 +13,7 @@ extern volatile sig_atomic_t g_waiting;
 // Data structure
 typedef struct	s_data {
 	bool		verbose;
+	int			size;
 }				t_data;
 
 // Stats structure
@@ -41,15 +42,13 @@ struct			s_icmp_err {
 };
 
 void			ping(char **args, t_data data);
-
 unsigned short	calculate_checksum(void *b, int len);
 void			setIPstr(struct addrinfo *res, char ip_str[][INET_ADDRSTRLEN]);
 const char		*get_icmp_error_msg(int type, int code);
-
-void			print_stats(t_stats stats);
+void			print_stats(t_stats stats, t_data data);
 void			print_verbose(struct icmphdr *icmp);
-
 void			sig_handler(int sig);
 void			alarm_handler(int sig);
+t_error			check_data(t_data data);
 
 #endif

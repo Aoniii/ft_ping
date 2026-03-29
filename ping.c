@@ -75,24 +75,29 @@ static void	handle_response(int ret, char *recv_buf, struct sockaddr_in *from, t
 	if (icmp_res->type == ICMP_ECHOREPLY) {
 		if (icmp_res->un.echo.id == (uint16_t)(getpid() & 0xFFFF) && icmp_res->un.echo.sequence == (uint16_t)expected_seq) {
 			int	payload_len = ret - hlen - (int)sizeof(struct icmphdr);
+			double diff = -1;
 			if (payload_len >= (int)sizeof(struct timeval)) {
 				start = (struct timeval *)(recv_buf + hlen + sizeof(struct icmphdr));
-			} else {
-				fprintf(stderr, "ft_ping: payload too short for timestamp\n");
-				return;
+
+				gettimeofday(&end, NULL);
+				diff = (end.tv_sec - start->tv_sec) * 1000.0 + (end.tv_usec - start->tv_usec) / 1000.0;
+
+				if (diff < stats->min) stats->min = diff;
+				if (diff > stats->max) stats->max = diff;
+				stats->sum += diff;
+				stats->sum_sq += (diff * diff);
 			}
-			gettimeofday(&end, NULL);
-
-			double diff = (end.tv_sec - start->tv_sec) * 1000.0 + (end.tv_usec - start->tv_usec) / 1000.0;
-	
 			stats->received++;
-			if (diff < stats->min) stats->min = diff;
-			if (diff > stats->max) stats->max = diff;
-			stats->sum += diff;
-			stats->sum_sq += (diff * diff);
 
-			printf("%d bytes from %s: icmp_seq=%d ttl=%d time=%.3f ms\n",
-				   ret - hlen, inet_ntoa(from->sin_addr), icmp_res->un.echo.sequence, ip_res->ip_ttl, diff);
+			printf(
+				"%d bytes from %s: icmp_seq=%d ttl=%d",
+				ret - hlen,
+				inet_ntoa(from->sin_addr),
+				icmp_res->un.echo.sequence,
+				ip_res->ip_ttl
+			);
+			if (diff > 0) printf(" time=%.3f ms", diff);
+			printf("\n");
 		}
 	} else {
 		printf("%d bytes from %s: %s\n", ret - hlen, inet_ntoa(from->sin_addr), 
@@ -162,8 +167,7 @@ static void ping_loop(int sock_fd, struct addrinfo *res, t_stats *stats, t_data 
 
 void	ping(char **args, t_data data) {
 	int	index = 0;
-	int	payload_size = 56;
-	int	total_size = sizeof(struct icmphdr) + payload_size;
+	int	total_size = sizeof(struct icmphdr) + data.size;
 
 	signal(SIGALRM, alarm_handler);
 	signal(SIGINT, sig_handler);
@@ -180,14 +184,14 @@ void	ping(char **args, t_data data) {
 		}
 
 		setIPstr(res, &ip_str);
-		printf("PING %s (%s): %d data bytes", args[index], ip_str, payload_size);
+		printf("PING %s (%s): %d data bytes", args[index], ip_str, data.size);
 		if (data.verbose)
 			printf(", id 0x%04x = %u", getpid() & 0xFFFF, getpid() & 0xFFFF);
 		printf("\n");
 
 		ping_loop(sock_fd, res, &stats, data, total_size);
 
-		print_stats(stats);
+		print_stats(stats, data);
 		freeaddrinfo(res);
 		close(sock_fd);
 		index++;

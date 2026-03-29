@@ -1,4 +1,5 @@
 MAIN_SRCS	=	main.c
+MAIN_SRCS	+=	check.c
 MAIN_SRCS	+=	ping.c
 MAIN_SRCS	+=	print.c
 MAIN_SRCS	+=	signal.c

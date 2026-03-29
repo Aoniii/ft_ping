@@ -18,7 +18,7 @@ static void help(const t_parser_info info, const t_option *options) {
 		if (opt->flags == 0 && !opt->short_opt && !opt->long_opt)
 			break;
 		if (opt->flags & OPT_CATEGORY) {
-			printf(" %s\n", opt->help);
+			printf("%s", opt->help);
 			continue;
 		}
 		if (opt->flags & OPT_HIDDEN_HELP)
