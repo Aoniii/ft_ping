@@ -96,7 +96,7 @@ static void	handle_response(int ret, char *recv_buf, struct sockaddr_in *from, t
 				icmp_res->un.echo.sequence,
 				ip_res->ip_ttl
 			);
-			if (diff > 0) printf(" time=%.3f ms", diff);
+			if (diff != -1) printf(" time=%.3f ms", diff);
 			printf("\n");
 		}
 	} else {
