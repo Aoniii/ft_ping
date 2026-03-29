@@ -9,19 +9,11 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <errno.h>
+#include <poll.h>
 
 static t_error	init(int *sock_fd, struct addrinfo *hints, struct addrinfo **res, char *args, t_stats *stats) {
 	if ((*sock_fd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP)) == -1) {
 		perror("socket");
-		return (ERROR);
-	}
-
-	struct timeval	tv;
-	tv.tv_sec = 1;
-	tv.tv_usec = 0;
-	if (setsockopt(*sock_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
-		perror("setsockopt");
-		close(*sock_fd);
 		return (ERROR);
 	}
 
@@ -140,27 +132,48 @@ static void ping_loop(int sock_fd, struct addrinfo *res, t_stats *stats, t_data 
 	struct sockaddr_in	from;
 	socklen_t			from_len;
 	int					sequence = 0;
+	struct pollfd		fds[1];
+
+	fds[0].fd = sock_fd;
+	fds[0].events = POLLIN;
 
 	while (g_running) {
-		if (!g_waiting) {
-			if (send_ping(sock_fd, res, sequence++, total_size) == ERROR)
-				break;
-			stats->transmitted++;
-			g_waiting = 1;
-			alarm(1);
-		}
+		struct timeval	send_time;
+		gettimeofday(&send_time, NULL);
 
-		from_len = sizeof(from);
-		ssize_t ret = recvfrom(sock_fd, recv_buf, sizeof(recv_buf), 0, (struct sockaddr *)&from, &from_len);
-		if (ret < 0) {
-			if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK)
-				continue;
-			perror("recvfrom");
+		if (send_ping(sock_fd, res, sequence++, total_size) == ERROR)
 			break;
-		}
-	
-		if (ret > 0) {
-			handle_response(ret, recv_buf, &from, stats, data, sequence - 1);
+		stats->transmitted++;
+
+		while (g_running) {
+			struct timeval	now;
+			gettimeofday(&now, NULL);
+
+			int elapsed =	(now.tv_sec - send_time.tv_sec) * 1000
+							+ (now.tv_usec - send_time.tv_usec) / 1000;
+			int timeout = 1000 - elapsed;
+			if (timeout <= 0) break;
+
+			int poll_ret = poll(fds, 1, timeout);
+			if (poll_ret < 0) {
+				if (errno == EINTR) break;
+				perror("poll");
+				g_running = 0;
+				break;
+			}
+			if (poll_ret == 0)
+				break;
+
+			from_len = sizeof(from);
+			ssize_t ret = recvfrom(sock_fd, recv_buf, sizeof(recv_buf), 0, (struct sockaddr *)&from, &from_len);
+			if (ret < 0) {
+				if (errno == EINTR || errno == EAGAIN) break;
+				perror("recvfrom");
+				g_running = 0;
+				break;
+			}
+			if (ret > 0)
+				handle_response(ret, recv_buf, &from, stats, data, sequence - 1);
 		}
 	}
 }
@@ -169,7 +182,6 @@ void	ping(char **args, t_data data) {
 	int	index = 0;
 	int	total_size = sizeof(struct icmphdr) + data.size;
 
-	signal(SIGALRM, alarm_handler);
 	signal(SIGINT, sig_handler);
 
 	while (args[index] && g_running) {

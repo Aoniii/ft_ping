@@ -8,7 +8,6 @@
 # include <signal.h>
 
 extern volatile sig_atomic_t g_running;
-extern volatile sig_atomic_t g_waiting;
 
 // Data structure
 typedef struct	s_data {
@@ -48,7 +47,6 @@ const char		*get_icmp_error_msg(int type, int code);
 void			print_stats(t_stats stats, t_data data);
 void			print_verbose(struct icmphdr *icmp);
 void			sig_handler(int sig);
-void			alarm_handler(int sig);
 t_error			check_data(t_data data);
 
 #endif

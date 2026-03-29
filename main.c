@@ -3,7 +3,6 @@
 #include <stdio.h>
 
 volatile sig_atomic_t g_running = 1;
-volatile sig_atomic_t g_waiting = 0;
 
 int	main(int argc, char **argv) {
 	t_parser_ctx	ctx;
