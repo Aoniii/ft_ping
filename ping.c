@@ -149,9 +149,9 @@ static void ping_loop(int sock_fd, struct addrinfo *res, t_stats *stats, t_data 
 			struct timeval	now;
 			gettimeofday(&now, NULL);
 
-			int elapsed =	(now.tv_sec - send_time.tv_sec) * 1000
+			int	elapsed =	(now.tv_sec - send_time.tv_sec) * 1000
 							+ (now.tv_usec - send_time.tv_usec) / 1000;
-			int timeout = 1000 - elapsed;
+			int	timeout = 1000 - elapsed;
 			if (timeout <= 0) break;
 
 			int poll_ret = poll(fds, 1, timeout);

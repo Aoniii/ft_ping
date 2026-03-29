@@ -52,7 +52,27 @@ Report bugs to <https://github.com/Aoniii>."
 					.options = option
 				}
 			},
-			.help		= ""
+			.help		= "give this help list"
+		},
+		{
+			.short_opt	= 0,
+			.long_opt	= "usage",
+			.flags		= OPT_LONG | OPT_CALLBACK_EXIT | TYPE_CALLBACK,
+			.value		= (void *)&(t_callback_info){
+				.fn = callback_usage,
+				.data = NULL
+			},
+			.help		= "give a short usage message"
+		},
+		{
+			.short_opt	= 'V',
+			.long_opt	= "version",
+			.flags		= OPT_SHORT | OPT_LONG | OPT_CALLBACK_EXIT | TYPE_CALLBACK,
+			.value		= (void *)&(t_callback_info){
+				.fn = callback_version,
+				.data = NULL
+			},
+			.help		= "print program version"
 		},
 		{0}
 	};
@@ -66,7 +86,7 @@ Report bugs to <https://github.com/Aoniii>."
 
 	if (!args || !args[0]) {
 		printf("ft_ping: missing host operand\n");
-		printf("Try 'ping --help' for more information.\n");
+		printf("Try './ft_ping --help' or './ft_ping --usage' for more information.\n");
 		cleaner(args);
 		return (1);
 	}

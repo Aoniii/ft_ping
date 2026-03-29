@@ -1,5 +1,6 @@
 #include "ping.h"
 #include <arpa/inet.h>
+#include <stdio.h>
 
 unsigned short	calculate_checksum(void *b, int len) {
 	unsigned short	*buf = b;
@@ -43,4 +44,16 @@ const char	*get_icmp_error_msg(int type, int code) {
 	return ("Unknown ICMP Error");
 }
 
+void	callback_usage(void *data) {
+	(void)data;
+	printf("Coming soon...\n");
+}
 
+void	callback_version(void *data) {
+	(void)data;
+	printf(
+		"ft_ping 1.0\n"
+		"snourry - <https://github.com/Aoniii>\n"
+		"This is a reimplementation of ping from inetutils-2.0.\n"
+	);
+}

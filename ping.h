@@ -48,5 +48,7 @@ void			print_stats(t_stats stats, t_data data);
 void			print_verbose(struct icmphdr *icmp);
 void			sig_handler(int sig);
 t_error			check_data(t_data data);
+void			callback_usage(void *data);
+void			callback_version(void *data);
 
 #endif
