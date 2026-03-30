@@ -19,12 +19,20 @@ Report bugs to <https://github.com/Aoniii>."
 	};
 
 	t_data	data = {
+		.count = 0,
 		.verbose = false,
 		.size = 56
 	};
 
 	t_option	option[] = {
 		CATEGORY(" Options valid for all request types:\n\n"),
+		{
+			.short_opt	= 'c',
+			.long_opt	= "count",
+			.flags		= OPT_SHORT | OPT_LONG | TYPE_INT,
+			.value		= &data.count,
+			.help		= "stop after sending NUMBER packets"
+		},
 		{
 			.short_opt	= 'v',
 			.long_opt	= "verbose",

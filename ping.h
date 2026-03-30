@@ -11,6 +11,7 @@ extern volatile sig_atomic_t g_running;
 
 // Data structure
 typedef struct	s_data {
+	int			count;
 	bool		verbose;
 	int			size;
 }				t_data;

@@ -21,9 +21,9 @@ static t_error	init(int *sock_fd, struct addrinfo *hints, struct addrinfo **res,
 	(*hints).ai_family = AF_INET;
 	(*hints).ai_socktype = SOCK_RAW;
 
-	if (getaddrinfo(args, NULL, hints, res) != 0) {
-		fprintf(stderr, "ft_ping: unknown host\n");
-		close(*sock_fd);
+	if ((getaddrinfo(args, NULL, hints, res)) != 0) {
+		if (!g_running) printf("\n");
+		else fprintf(stderr, "ft_ping: unknown host\n");
 		return (ERROR);
 	}
 
@@ -133,6 +133,7 @@ static void ping_loop(int sock_fd, struct addrinfo *res, t_stats *stats, t_data 
 	socklen_t			from_len;
 	int					sequence = 0;
 	struct pollfd		fds[1];
+	int					count = 0;
 
 	fds[0].fd = sock_fd;
 	fds[0].events = POLLIN;
@@ -175,6 +176,8 @@ static void ping_loop(int sock_fd, struct addrinfo *res, t_stats *stats, t_data 
 			if (ret > 0)
 				handle_response(ret, recv_buf, &from, stats, data, sequence - 1);
 		}
+		count++;
+		if (data.count > 0 && count >= data.count) break;
 	}
 }
 

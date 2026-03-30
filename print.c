@@ -16,7 +16,7 @@ void	print_stats(t_stats stats, t_data data) {
 
 	printf("--- %s ping statistics ---\n", stats.addr);
 	printf(
-			"%d packets transmitted, %d received, %d%% packet loss\n",
+			"%d packets transmitted, %d packets received, %d%% packet loss\n",
 			stats.transmitted,
 			stats.received,
 			loss
@@ -28,7 +28,7 @@ void	print_stats(t_stats stats, t_data data) {
 		double	mdev = sqrt(var < 0 ? 0 : var);
 
 		printf(
-				"round-trip min/avg/max/mdev = %.3f/%.3f/%.3f/%.3f ms\n",
+				"round-trip min/avg/max/stddev = %.3f/%.3f/%.3f/%.3f ms\n",
 				stats.min,
 				avg,
 				stats.max,
