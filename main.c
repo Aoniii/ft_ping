@@ -22,6 +22,7 @@ Report bugs to <https://github.com/Aoniii>."
 		.count = 0,
 		.verbose = false,
 		.linger = 10,
+		.flood = false,
 		.size = 56
 	};
 
@@ -49,6 +50,13 @@ Report bugs to <https://github.com/Aoniii>."
 			.help		= "number of seconds to wait for response"
 		},
 		CATEGORY("\n Options valid for --echo requests:\n\n"),
+		{
+			.short_opt	= 'f',
+			.long_opt	= "flood",
+			.flags		= OPT_SHORT | OPT_LONG | TYPE_BOOLEAN,
+			.value		= &data.flood,
+			.help		= "flood ping (root only)"
+		},
 		{
 			.short_opt	= 's',
 			.long_opt	= "size",

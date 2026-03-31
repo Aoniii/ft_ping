@@ -14,6 +14,7 @@ typedef struct	s_data {
 	int			count;
 	bool		verbose;
 	int			linger;
+	bool		flood;
 	int			size;
 }				t_data;
 

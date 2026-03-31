@@ -55,7 +55,7 @@ void	print_verbose(struct icmphdr *icmp) {
 	//TOS: Type of Service, package priority (generally 00)
 	printf("  %02x", orig_ip->ip_tos);
 	//Len: Total Length (header + data)
-	printf(" %04x", (ntohs(orig_ip->ip_len) > 0x2000) ? orig_ip->ip_len : ntohs(orig_ip->ip_len));
+	printf(" %04x", ntohs(orig_ip->ip_len));
 	//ID: Identification (A unique identifier to help reconstruct the packet if it is fragmented)
 	printf(" %04x", ntohs(orig_ip->ip_id));
 	//Flg: Flags (Indicates whether the packet can be fragmented)

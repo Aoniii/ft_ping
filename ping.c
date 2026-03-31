@@ -81,15 +81,19 @@ static void	handle_response(int ret, char *recv_buf, struct sockaddr_in *from, t
 			}
 			stats->received++;
 
-			printf(
-				"%d bytes from %s: icmp_seq=%d ttl=%d",
-				ret - hlen,
-				inet_ntoa(from->sin_addr),
-				icmp_res->un.echo.sequence,
-				ip_res->ip_ttl
-			);
-			if (diff != -1) printf(" time=%.3f ms", diff);
-			printf("\n");
+			if (data.flood) {
+				putchar('\b');
+			} else {
+				printf(
+					"%d bytes from %s: icmp_seq=%d ttl=%d",
+					ret - hlen,
+					inet_ntoa(from->sin_addr),
+					icmp_res->un.echo.sequence,
+					ip_res->ip_ttl
+				);
+				if (diff != -1) printf(" time=%.3f ms", diff);
+				printf("\n");
+			}
 		}
 	} else {
 		if (icmp_res->type == ICMP_ECHO) return;
@@ -129,10 +133,76 @@ static t_error	send_ping(int sock_fd, struct addrinfo *res, int seq, int total_s
 	return (SUCCESS);
 }
 
-static void ping_loop(int sock_fd, struct addrinfo *res, t_stats *stats, t_data data, int total_size) {
+static void	recv_one(int sock_fd, char *recv_buf, struct sockaddr_in *from, t_stats *stats, t_data data) {
+	socklen_t	from_len = sizeof(*from);
+	ssize_t		ret = recvfrom(sock_fd, recv_buf, IP_MAXPACKET, 0, (struct sockaddr *)from, &from_len);
+
+	if (ret < 0) {
+		if (errno == EINTR || errno == EAGAIN)
+			return;
+		perror("recvfrom");
+		g_running = 0;
+		return;
+	}
+	if (ret > 0)
+		handle_response((int)ret, recv_buf, from, stats, data);
+}
+
+static void	ping_loop_flood(int sock_fd, struct addrinfo *res, t_stats *stats, t_data data, int total_size) {
 	char				recv_buf[IP_MAXPACKET];
 	struct sockaddr_in	from;
-	socklen_t			from_len;
+	int					sequence = 0;
+	struct pollfd		fds[1];
+	int					count = 0;
+
+	fds[0].fd = sock_fd;
+	fds[0].events = POLLIN;
+
+	while (g_running) {
+		if (send_ping(sock_fd, res, sequence++, total_size) == ERROR)
+			break;
+		stats->transmitted++;
+		putchar('.');
+
+		int poll_ret = poll(fds, 1, 10);
+
+		if (poll_ret < 0) {
+			if (errno == EINTR)
+				continue;
+			perror("poll");
+			g_running = 0;
+			break;
+		}
+
+		while (poll_ret > 0) {
+			recv_one(sock_fd, recv_buf, &from, stats, data);
+			poll_ret = poll(fds, 1, 0);
+		}
+
+		if (poll_ret < 0 && errno != EINTR) {
+			perror("poll");
+			g_running = 0;
+			break;
+		}
+
+		count++;
+		if (data.count > 0 && count >= data.count) break;
+		usleep(10000);
+	}
+
+	while (g_running) {
+		int	poll_ret = poll(fds, 1, 300);
+		if (poll_ret <= 0)
+			break;
+		recv_one(sock_fd, recv_buf, &from, stats, data);
+	}
+
+	printf("\b");
+}
+
+static void	ping_loop(int sock_fd, struct addrinfo *res, t_stats *stats, t_data data, int total_size) {
+	char				recv_buf[IP_MAXPACKET];
+	struct sockaddr_in	from;
 	int					sequence = 0;
 	struct pollfd		fds[1];
 	int					count = 0;
@@ -148,10 +218,9 @@ static void ping_loop(int sock_fd, struct addrinfo *res, t_stats *stats, t_data 
 			break;
 		stats->transmitted++;
 
-
 		bool	last_packet = (data.count > 0 && count + 1 >= data.count);
 		int		wait_ms = last_packet ? data.linger * 1000 : 1000;
-	
+
 		while (g_running) {
 			struct timeval	now;
 			gettimeofday(&now, NULL);
@@ -171,16 +240,7 @@ static void ping_loop(int sock_fd, struct addrinfo *res, t_stats *stats, t_data 
 			if (poll_ret == 0)
 				break;
 
-			from_len = sizeof(from);
-			ssize_t ret = recvfrom(sock_fd, recv_buf, sizeof(recv_buf), 0, (struct sockaddr *)&from, &from_len);
-			if (ret < 0) {
-				if (errno == EINTR || errno == EAGAIN) break;
-				perror("recvfrom");
-				g_running = 0;
-				break;
-			}
-			if (ret > 0)
-				handle_response(ret, recv_buf, &from, stats, data);
+			recv_one(sock_fd, recv_buf, &from, stats, data);
 
 			if (last_packet && stats->received >= stats->transmitted) break;
 		}
@@ -212,7 +272,8 @@ void	ping(char **args, t_data data) {
 			printf(", id 0x%04x = %u", getpid() & 0xFFFF, getpid() & 0xFFFF);
 		printf("\n");
 
-		ping_loop(sock_fd, res, &stats, data, total_size);
+		if (data.flood) ping_loop_flood(sock_fd, res, &stats, data, total_size);
+		else ping_loop(sock_fd, res, &stats, data, total_size);
 
 		print_stats(stats, data);
 		freeaddrinfo(res);
