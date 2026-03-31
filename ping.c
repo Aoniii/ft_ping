@@ -39,7 +39,7 @@ static t_error	init(int *sock_fd, struct addrinfo *hints, struct addrinfo **res,
 	return (SUCCESS);
 }
 
-static void	handle_response(int ret, char *recv_buf, struct sockaddr_in *from, t_stats *stats, t_data data, int expected_seq) {
+static void	handle_response(int ret, char *recv_buf, struct sockaddr_in *from, t_stats *stats, t_data data) {
 	if (ret < (int)sizeof(struct ip)) {
 		if (data.verbose)
 			fprintf(stderr, "ft_ping: packet too short (%d bytes) for IP header\n", ret);
@@ -65,7 +65,7 @@ static void	handle_response(int ret, char *recv_buf, struct sockaddr_in *from, t
 	struct timeval	*start, end;
 
 	if (icmp_res->type == ICMP_ECHOREPLY) {
-		if (icmp_res->un.echo.id == (uint16_t)(getpid() & 0xFFFF) && icmp_res->un.echo.sequence == (uint16_t)expected_seq) {
+		if (icmp_res->un.echo.id == (uint16_t)(getpid() & 0xFFFF)) {
 			int	payload_len = ret - hlen - (int)sizeof(struct icmphdr);
 			double diff = -1;
 			if (payload_len >= (int)sizeof(struct timeval)) {
@@ -92,6 +92,8 @@ static void	handle_response(int ret, char *recv_buf, struct sockaddr_in *from, t
 			printf("\n");
 		}
 	} else {
+		if (icmp_res->type == ICMP_ECHO) return;
+
 		printf("%d bytes from %s: %s\n", ret - hlen, inet_ntoa(from->sin_addr), 
 			   get_icmp_error_msg(icmp_res->type, icmp_res->code));
 		
@@ -146,13 +148,17 @@ static void ping_loop(int sock_fd, struct addrinfo *res, t_stats *stats, t_data 
 			break;
 		stats->transmitted++;
 
+
+		bool	last_packet = (data.count > 0 && count + 1 >= data.count);
+		int		wait_ms = last_packet ? data.linger * 1000 : 1000;
+	
 		while (g_running) {
 			struct timeval	now;
 			gettimeofday(&now, NULL);
 
 			int	elapsed =	(now.tv_sec - send_time.tv_sec) * 1000
 							+ (now.tv_usec - send_time.tv_usec) / 1000;
-			int	timeout = 1000 - elapsed;
+			int	timeout = wait_ms - elapsed;
 			if (timeout <= 0) break;
 
 			int poll_ret = poll(fds, 1, timeout);
@@ -174,7 +180,9 @@ static void ping_loop(int sock_fd, struct addrinfo *res, t_stats *stats, t_data 
 				break;
 			}
 			if (ret > 0)
-				handle_response(ret, recv_buf, &from, stats, data, sequence - 1);
+				handle_response(ret, recv_buf, &from, stats, data);
+
+			if (last_packet && stats->received >= stats->transmitted) break;
 		}
 		count++;
 		if (data.count > 0 && count >= data.count) break;

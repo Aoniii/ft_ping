@@ -13,6 +13,7 @@ extern volatile sig_atomic_t g_running;
 typedef struct	s_data {
 	int			count;
 	bool		verbose;
+	int			linger;
 	int			size;
 }				t_data;
 

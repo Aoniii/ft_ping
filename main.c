@@ -21,6 +21,7 @@ Report bugs to <https://github.com/Aoniii>."
 	t_data	data = {
 		.count = 0,
 		.verbose = false,
+		.linger = 10,
 		.size = 56
 	};
 
@@ -39,6 +40,13 @@ Report bugs to <https://github.com/Aoniii>."
 			.flags		= OPT_SHORT | OPT_LONG | TYPE_BOOLEAN,
 			.value		= &data.verbose,
 			.help		= "verbose output"
+		},
+		{
+			.short_opt	= 'W',
+			.long_opt	= "linger",
+			.flags		= OPT_SHORT | OPT_LONG | TYPE_INT,
+			.value		= &data.linger,
+			.help		= "number of seconds to wait for response"
 		},
 		CATEGORY("\n Options valid for --echo requests:\n\n"),
 		{
