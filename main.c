@@ -60,7 +60,7 @@ Report bugs to <https://github.com/Aoniii>."
 		{
 			.short_opt	= 's',
 			.long_opt	= "size",
-			.flags		= OPT_SHORT | OPT_LONG | TYPE_UINT,
+			.flags		= OPT_SHORT | OPT_LONG | TYPE_INT,
 			.value		= &data.size,
 			.help		= "send NUMBER data octets"
 		},

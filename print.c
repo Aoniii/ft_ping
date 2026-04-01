@@ -11,8 +11,12 @@ void	print_stats(t_stats stats, t_data data) {
 	gettimeofday(&end, NULL);
 
 	int		loss = 0;
-	if (stats.transmitted > 0)
-		loss = (stats.transmitted - stats.received) * 100 / stats.transmitted;
+	if (stats.transmitted > 0) {
+		loss = stats.transmitted - stats.received;
+		if (loss < 0)
+			loss = 0;
+		loss = loss * 100 / stats.transmitted;
+	}
 
 	printf("--- %s ping statistics ---\n", stats.addr);
 	printf(

@@ -1,4 +1,5 @@
 #include "ping.h"
+#include <signal.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -24,6 +25,7 @@ static t_error	init(int *sock_fd, struct addrinfo *hints, struct addrinfo **res,
 	if ((getaddrinfo(args, NULL, hints, res)) != 0) {
 		if (!g_running) printf("\n");
 		else fprintf(stderr, "ft_ping: unknown host\n");
+		close(*sock_fd);
 		return (ERROR);
 	}
 
@@ -88,7 +90,7 @@ static void	handle_response(int ret, char *recv_buf, struct sockaddr_in *from, t
 					"%d bytes from %s: icmp_seq=%d ttl=%d",
 					ret - hlen,
 					inet_ntoa(from->sin_addr),
-					icmp_res->un.echo.sequence,
+					ntohs(icmp_res->un.echo.sequence),
 					ip_res->ip_ttl
 				);
 				if (diff != -1) printf(" time=%.3f ms", diff);
@@ -117,7 +119,7 @@ static t_error	send_ping(int sock_fd, struct addrinfo *res, int seq, int total_s
 	memset(packet, 0, total_size);
 	icmp->type = ICMP_ECHO;
 	icmp->un.echo.id = (uint16_t)(getpid() & 0xFFFF);
-	icmp->un.echo.sequence = seq;
+	icmp->un.echo.sequence = htons(seq);
 
 	struct timeval	now;
 	gettimeofday(&now, NULL);
@@ -253,7 +255,10 @@ void	ping(char **args, t_data data) {
 	int	index = 0;
 	int	total_size = sizeof(struct icmphdr) + data.size;
 
-	signal(SIGINT, sig_handler);
+	if (signal(SIGINT, sig_handler) == SIG_ERR) {
+		perror("signal");
+		return;
+	}
 
 	while (args[index] && g_running) {
 		int				sock_fd;
