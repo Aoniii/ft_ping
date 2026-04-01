@@ -16,9 +16,9 @@
 /**
  * @brief Initialize the socket and the address information
  * 
- * Initializes a ping session for a given host. Creates a raw ICMP socket, resolves the target hostname/IP using getaddrinfo,
- * and zeroes out the statistics structure (min/max RTT, counters, start time). Returns ERROR if the socket creation or DNS
- * resolution fails, SUCCESS otherwise.
+ * Initializes a ping session for a given host. Creates a raw ICMP socket, sets the TTL value using setsockopt (default 64, or user-specified via --ttl),
+ * resolves the target hostname/IP using getaddrinfo, and zeroes out the statistics structure (min/max RTT, counters, start time).
+ * Returns ERROR if the socket creation, TTL configuration, or DNS resolution fails, SUCCESS otherwise.
  *
  * @param sock_fd The socket file descriptor
  * @param hints The hints for the address information
