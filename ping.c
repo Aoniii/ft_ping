@@ -25,10 +25,17 @@
  * @param res The address information
  * @param args The target hostname/IP
  * @param stats The statistics
+ * @param data The data
  */
-static t_error	init(int *sock_fd, struct addrinfo *hints, struct addrinfo **res, char *args, t_stats *stats) {
+static t_error	init(int *sock_fd, struct addrinfo *hints, struct addrinfo **res, char *args, t_stats *stats, t_data data) {
 	if ((*sock_fd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP)) == -1) {
 		perror("socket");
+		return (ERROR);
+	}
+
+	if (setsockopt(*sock_fd, IPPROTO_IP, IP_TTL, &data.ttl, sizeof(data.ttl)) < 0) {
+		perror("setsockopt(IP_TTL)");
+		close(*sock_fd);
 		return (ERROR);
 	}
 
@@ -58,9 +65,9 @@ static t_error	init(int *sock_fd, struct addrinfo *hints, struct addrinfo **res,
 /**
  * @brief Get the display address
  * 
- * Returns a display string for the source address of a received packet. When -n is not set, performs a reverse DNS lookup using getnameinfo.
- * The commented-out line would format the output as hostname (ip) to match inetutils-2.0 display, but currently only the IP is shown to match
- * the subject requirement of not doing DNS resolution in the packet return. When -n is set or the reverse lookup fails, returns the raw IP address.
+ * Returns a display string for the source address of an ICMP error packet.
+ * When -n is not set, performs a reverse DNS lookup using getnameinfo. On success, formats the output as hostname (ip) to match inetutils-2.0 display.
+ * When -n is set or the reverse lookup fails, returns the raw IP address only. Only used for ICMP error messages, not for normal echo replies.
  *
  * @param from The source address
  * @param data The data (numeric flag)
@@ -71,8 +78,7 @@ static char	*get_display_addr(struct sockaddr_in *from, t_data data) {
 	char		host[NI_MAXHOST];
  
 	if (!data.numeric && getnameinfo((struct sockaddr *)from, sizeof(*from), host, sizeof(host), NULL, 0, NI_NAMEREQD) == 0) {
-		//snprintf(display, sizeof(display), "%s (%s)", host, inet_ntoa(from->sin_addr));
-		snprintf(display, sizeof(display), "%s", inet_ntoa(from->sin_addr));
+		snprintf(display, sizeof(display), "%s (%s)", host, inet_ntoa(from->sin_addr));
 		return (display);
 	}
 	return (inet_ntoa(from->sin_addr));
@@ -141,7 +147,7 @@ static void	handle_response(int ret, char *recv_buf, struct sockaddr_in *from, t
 				printf(
 					"%d bytes from %s: icmp_seq=%d ttl=%d",
 					ret - hlen,
-					get_display_addr(from, data),
+					inet_ntoa(from->sin_addr),
 					ntohs(icmp_res->un.echo.sequence),
 					ip_res->ip_ttl
 				);
@@ -382,7 +388,7 @@ void	ping(char **args, t_data data) {
 		t_stats			stats;
 		char			ip_str[INET_ADDRSTRLEN];
 
-		if (init(&sock_fd, &hints, &res, args[index], &stats) != SUCCESS) {
+		if (init(&sock_fd, &hints, &res, args[index], &stats, data) != SUCCESS) {
 			index++;
 			continue;
 		}

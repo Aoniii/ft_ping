@@ -9,6 +9,15 @@ t_error check_data(t_data data) {
 		return (ERROR);
 	}
 
+	if (data.ttl < 1) {
+		fprintf(stderr, "ft_ping: option value too small: '%d'\n", data.ttl);
+		return (ERROR);
+	}
+	if (data.ttl > 255) {
+		fprintf(stderr, "ft_ping: option value too big: '%d'\n", data.ttl);
+		return (ERROR);
+	}
+
 	if (data.flood && geteuid() != 0) {
 		fprintf(stderr, "ft_ping: option requires root privileges\n");
 		return (ERROR);

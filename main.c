@@ -21,6 +21,7 @@ Report bugs to <https://github.com/Aoniii>."
 	t_data	data = {
 		.count = 0,
 		.numeric = false,
+		.ttl = 64,
 		.verbose = false,
 		.linger = 10,
 		.flood = false,
@@ -42,6 +43,13 @@ Report bugs to <https://github.com/Aoniii>."
 			.flags		= OPT_SHORT | OPT_LONG | TYPE_BOOLEAN,
 			.value		= &data.numeric,
 			.help		= "do not resolve host addresses"
+		},
+		{
+			.short_opt	= 0,
+			.long_opt	= "ttl",
+			.flags		=  OPT_LONG | TYPE_INT,
+			.value		= &data.ttl,
+			.help		= "specify N as time-to-live"
 		},
 		{
 			.short_opt	= 'v',
