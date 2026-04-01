@@ -1,4 +1,5 @@
 #include "ping.h"
+#include <netdb.h>
 #include <signal.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -39,6 +40,18 @@ static t_error	init(int *sock_fd, struct addrinfo *hints, struct addrinfo **res,
 	gettimeofday(&stats->start, NULL);
 
 	return (SUCCESS);
+}
+
+static char	*get_display_addr(struct sockaddr_in *from, t_data data) {
+	static char	display[NI_MAXHOST + INET_ADDRSTRLEN + 4];
+	char		host[NI_MAXHOST];
+ 
+	if (!data.numeric && getnameinfo((struct sockaddr *)from, sizeof(*from), host, sizeof(host), NULL, 0, NI_NAMEREQD) == 0) {
+		//snprintf(display, sizeof(display), "%s (%s)", host, inet_ntoa(from->sin_addr));
+		snprintf(display, sizeof(display), "%s", inet_ntoa(from->sin_addr));
+		return (display);
+	}
+	return (inet_ntoa(from->sin_addr));
 }
 
 static void	handle_response(int ret, char *recv_buf, struct sockaddr_in *from, t_stats *stats, t_data data) {
@@ -89,7 +102,7 @@ static void	handle_response(int ret, char *recv_buf, struct sockaddr_in *from, t
 				printf(
 					"%d bytes from %s: icmp_seq=%d ttl=%d",
 					ret - hlen,
-					inet_ntoa(from->sin_addr),
+					get_display_addr(from, data),
 					ntohs(icmp_res->un.echo.sequence),
 					ip_res->ip_ttl
 				);
@@ -100,8 +113,12 @@ static void	handle_response(int ret, char *recv_buf, struct sockaddr_in *from, t
 	} else {
 		if (icmp_res->type == ICMP_ECHO) return;
 
-		printf("%d bytes from %s: %s\n", ret - hlen, inet_ntoa(from->sin_addr), 
-			   get_icmp_error_msg(icmp_res->type, icmp_res->code));
+		printf(
+				"%d bytes from %s: %s\n",
+				ret - hlen,
+				get_display_addr(from, data),
+				get_icmp_error_msg(icmp_res->type, icmp_res->code)
+		);
 		
 		if (data.verbose) {
 			int icmp_payload_len = ret - hlen - (int)sizeof(struct icmphdr);

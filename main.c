@@ -20,6 +20,7 @@ Report bugs to <https://github.com/Aoniii>."
 
 	t_data	data = {
 		.count = 0,
+		.numeric = false,
 		.verbose = false,
 		.linger = 10,
 		.flood = false,
@@ -34,6 +35,13 @@ Report bugs to <https://github.com/Aoniii>."
 			.flags		= OPT_SHORT | OPT_LONG | TYPE_INT,
 			.value		= &data.count,
 			.help		= "stop after sending NUMBER packets"
+		},
+		{
+			.short_opt	= 'n',
+			.long_opt	= "numeric",
+			.flags		= OPT_SHORT | OPT_LONG | TYPE_BOOLEAN,
+			.value		= &data.numeric,
+			.help		= "do not resolve host addresses"
 		},
 		{
 			.short_opt	= 'v',
