@@ -46,7 +46,7 @@ const char	*get_icmp_error_msg(int type, int code) {
 
 void	callback_usage(void *data) {
 	(void)data;
-	printf("Coming soon...\n");
+	printf("Usage: ./ft_ping [OPTION...] HOST ...\n");
 }
 
 void	callback_version(void *data) {
