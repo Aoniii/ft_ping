@@ -164,7 +164,7 @@ static void	handle_response(int ret, char *recv_buf, struct sockaddr_in *from, t
 				get_display_addr(from, data),
 				get_icmp_error_msg(icmp_res->type, icmp_res->code)
 		);
-		
+
 		if (data.verbose) {
 			int icmp_payload_len = ret - hlen - (int)sizeof(struct icmphdr);
 
