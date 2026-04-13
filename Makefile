@@ -3,8 +3,6 @@
 
 NAME		=	ft_ping
 
-.DEFAULT_GOAL := all
-
 CC			=	gcc
 CFLAGS		=	-Wall -Wextra -Werror
 
