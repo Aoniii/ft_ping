@@ -1,6 +1,8 @@
 -include ./parser/source.mk
 -include ./source.mk
 
+.DEFAULT_GOAL := all
+
 NAME		=	ft_ping
 
 CC			=	gcc
